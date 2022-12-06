@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, Optional
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -12,12 +13,50 @@ from .low_rank_utils import get_nm_from_W
 class ConnectionConfig:
     source_name: str
     target_name: str
-    rank: Union[int, str] = 'full'
+    rank: Optional[Union[int, str]] = None
     p_conn: float = 1.
-    norm: Union[float, None] = None
+    norm: Optional[float] = None
     #orthogonal: bool = False
     train_weights_direction: bool = True
-    mask: torch.Tensor = None # for masking input lines such as go cue
+    mask: Optional[torch.Tensor] = None # for masking input lines such as go cue
+    W: Optional[torch.Tensor] = None
+
+    def __init__(
+        self,
+        source_name: str,
+        target_name: str,
+        rank: Optional[Union[int, str]] = None,
+        p_conn: float = 1.,
+        norm: Optional[float] = None,
+        #orthogonal: bool = False
+        train_weights_direction: bool = True,
+        mask: Optional[torch.Tensor] = None, # for masking input lines such as go cue
+        W: Optional[torch.Tensor] = None,
+    ):
+        self.source_name = source_name
+        self.target_name = target_name
+
+        if W is not None:
+            assert rank is None
+            assert norm is None
+            #assert np.isclose(p_conn, 1)
+        self.W = W
+
+        assert (rank is None) or (rank == 'full') or isinstance(rank, int)
+        if rank is None:
+            self.rank = 'full'
+        else:
+            self.rank = rank
+        assert self.rank is not None
+
+        self.p_conn = p_conn
+
+        assert (norm is None) or isinstance(norm, float)
+        self.norm = norm
+        
+        self.train_weights_direction = train_weights_direction
+        self.mask = mask
+
 
     @property
     def weight_name(self):
@@ -25,17 +64,18 @@ class ConnectionConfig:
 
 
 class Connection(nn.Module):
-    def __init__(self, config, N_from, N_to):
+    def __init__(self,
+                 config: ConnectionConfig,
+                 N_from: Optional[int] = None,
+                 N_to: Optional[int] = None):
         super().__init__()
 
         self.source_name = config.source_name
         self.target_name = config.target_name
 
-        assert (config.rank == 'full') or isinstance(config.rank, int)
         self.rank = config.rank
         self.full_rank = (self.rank == 'full')
 
-        assert (config.norm is None) or isinstance(config.norm, float)
         self.norm = config.norm
 
         #self.orthogonal = config.orthogonal
@@ -45,26 +85,37 @@ class Connection(nn.Module):
         self.p_conn = config.p_conn
         self.mask = config.mask
 
+        if config.W is not None:
+            self._W = config.W
+            N_to, N_from = self._W.shape
+        else:
+            assert (N_to is not None) and (N_from is not None)
+            self._W = None
+
         self.connect(N_from, N_to)
 
     def connect(self, N_from: int, N_to: int) -> None:
         sparse_mask = torch.rand(N_to, N_from) < self.p_conn
         self.register_buffer(f'sparse_mask', sparse_mask)
 
-        if self.rank != 'full':
-            assert isinstance(self.rank, int)
-            _n, _m = get_nm_from_W(glorot_gauss_tensor(connectivity=sparse_mask),
-                                   self.rank)
-            self.n = nn.Parameter(_n, requires_grad = self.train_weights_direction)
-            self.m = nn.Parameter(_m, requires_grad = self.train_weights_direction)
+        if self._W is not None:
+            self._W = nn.Parameter(self._W,
+                                   requires_grad = self.train_weights_direction)
         else:
-            self._W = nn.Parameter(glorot_gauss_tensor(connectivity=sparse_mask),
-                                  requires_grad = self.train_weights_direction)
+            if self.rank != 'full':
+                assert isinstance(self.rank, int)
+                _n, _m = get_nm_from_W(glorot_gauss_tensor(connectivity=sparse_mask),
+                                       self.rank)
+                self.n = nn.Parameter(_n, requires_grad = self.train_weights_direction)
+                self.m = nn.Parameter(_m, requires_grad = self.train_weights_direction)
+            else:
+                self._W = nn.Parameter(glorot_gauss_tensor(connectivity=sparse_mask),
+                                      requires_grad = self.train_weights_direction)
 
-        if self.norm is not None:
-            assert isinstance(self.norm, float)
-            import geotorch
-            geotorch.sphere(self, 'W', radius = self.norm)
+            if self.norm is not None:
+                assert isinstance(self.norm, float)
+                import geotorch
+                geotorch.sphere(self, 'W', radius = self.norm)
 
         # TODO handle orthogonal and norm together
         # right now orthogonal makes the columns have unit norm
