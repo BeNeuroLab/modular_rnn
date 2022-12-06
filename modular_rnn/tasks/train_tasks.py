@@ -87,3 +87,74 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
         masks_t['uncertainty'] = 1.
 
         return input_signal, outputs_t, masks_t
+
+
+class CenterOutTaskWithReachProfiles(Task):
+    def __init__(self, dt, tau, T: int, N_batch: int, n_targets: int = 8, stim_noise=0.05):
+
+        output_dims = {'hand' : 2}
+
+        super().__init__(3,
+                         output_dims,
+                         dt,
+                         tau,
+                         T,
+                         N_batch)
+        self.stim_noise = stim_noise
+        self.n_targets = n_targets
+        self.targets = np.linspace(0, 2*np.pi, num = n_targets, endpoint = False)
+        
+    def generate_trial_params(self, batch, trial):
+        params = dict()
+        
+        target_id = np.random.randint(self.n_targets)
+        params['target_id'] = target_id
+        params['target_dir'] = self.targets[target_id]
+        params['target_cos'] = np.cos(params['target_dir'])
+        params['target_sin'] = np.sin(params['target_dir'])
+        params['target_cossin'] = np.array([params['target_cos'], params['target_sin']])
+        
+        params['idx_trial_start'] = 50
+        params['idx_target_on']   = params['idx_trial_start'] + np.random.randint(50, 200)
+        params['idx_go_cue']      = params['idx_target_on'] + np.random.randint(200, 500)
+        params['idx_trial_end']   = params['idx_go_cue'] + 450
+
+        params['stim_noise'] = self.stim_noise * np.random.randn(self.T, self.N_in)
+        
+        return params
+    
+    def trial_function(self, time, params):
+        target_cossin = params['target_cossin']
+        
+        # start with just noise
+        input_signal = params['stim_noise'][time, :]
+        
+        # add the input after the target onset
+        #if params['idx_target_on'] <= time < params['idx_target_on']+20:
+        if params['idx_target_on'] <= time:
+            input_signal += np.append(params['target_cossin'], 0)
+
+        # go signal should be on after the go cue
+        if time >= params['idx_go_cue']:
+            input_signal += np.append(np.zeros(self.N_in - 1), 1)
+            
+        # in the beginning the output is nothing, then it's the mean position or velocity profile
+        outputs_t = {}
+        if time < params['idx_go_cue']:
+            outputs_t['hand'] = np.zeros(self.output_dims['hand'])
+        else:
+            shifted_time = time - params['idx_go_cue']
+
+            # position is the extent projected to the x and y axes
+            extent_at_t = extent_curve(shifted_time)
+            outputs_t['hand'] = target_cossin * extent_at_t
+            
+        # we always care about correct position
+        masks_t = {}
+        if time > params['idx_trial_start']:
+            masks_t['hand'] = np.ones(self.output_dims['hand'])
+        else:
+            masks_t['hand'] = np.zeros(self.output_dims['hand'])
+            
+
+        return input_signal, outputs_t, masks_t
