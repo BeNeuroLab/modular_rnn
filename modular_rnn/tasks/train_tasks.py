@@ -83,7 +83,7 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
         else:
             masks_t['hand'] = np.zeros(self.output_dims['hand'])
             
-        outputs_t['uncertainty'] = params['cue_spread']
+        outputs_t['uncertainty'] = params['cue_var_log']
         masks_t['uncertainty'] = 1.
 
         return input_signal, outputs_t, masks_t
