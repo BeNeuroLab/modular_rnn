@@ -73,7 +73,7 @@ def train(
         should return a single value
     clipgrad : float, default 1.
         gradient clipping norm
-    pbar : bool, default True
+    progress_bar : bool, default True
         draw progress bar
 
     Returns
