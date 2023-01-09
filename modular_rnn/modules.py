@@ -118,7 +118,8 @@ class RNNModule(nn.Module):
         if self.full_rank:
             return self._W_rec
         else:
-            return self.n @ self.m.t()
+            #return self.n @ self.m.t()
+            return self.m @ self.n.t()
 
     def reparametrize_with_svd(self):
         self.n, self.m = get_nm_from_W(self.W_rec, self.rec_rank)

@@ -130,7 +130,8 @@ class Connection(nn.Module):
         if self.full_rank:
             return self._W
         else:
-            return self.n @ self.m.t()
+            #return self.n @ self.m.t()
+            return self.m @ self.n.t()
 
     @property
     def effective_W(self) -> torch.Tensor:
