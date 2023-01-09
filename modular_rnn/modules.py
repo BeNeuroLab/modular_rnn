@@ -57,12 +57,15 @@ class RNNModule(nn.Module):
     def sample_random_hidden_state_vector(self) -> torch.Tensor:
         return .1 + .01 * torch.randn(self.n_neurons)
 
+    def sample_random_hidden_state_batch(self) -> torch.Tensor:
+        return .1 + .01 * torch.randn(1, self.batch_size, self.n_neurons)
+
 
     def init_hidden(self) -> None:
         if self.use_constant_init_state:
             init_state = torch.tile(self.init_x, (1, self.batch_size, 1))
         else:
-            init_state = torch.tile(self.sample_random_hidden_state_vector(), (1, self.batch_size, 1))
+            init_state = self.sample_random_hidden_state_batch()
 
         # NOTE might need self.device
         self.hidden_states = [init_state]
