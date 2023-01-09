@@ -33,11 +33,15 @@ class MultiRegionRNN(nn.Module):
             'use_constant_init_state' : False,
             'train_recurrent_weights' : True,
         }
-        for (name, params) in regions_config.items():
-            for (param_name, param_val) in default_region_init_params.items():
-                params.setdefault(param_name, param_val)
+        for (name, module_or_params) in regions_config.items():
+            if isinstance(module_or_params, RNNModule):
+                self.regions[name] = module_or_params
+            else:
+                assert isinstance(module_or_params, dict)
+                for (param_name, param_val) in default_region_init_params.items():
+                    module_or_params.setdefault(param_name, param_val)
 
-            self.regions[name] = RNNModule(name, **params)
+                self.regions[name] = RNNModule(name, **module_or_params)
             
         self.outputs = {}
         for (name, dimensionality) in outputs.items():
