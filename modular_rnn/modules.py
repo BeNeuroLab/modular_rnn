@@ -55,10 +55,10 @@ class RNNModule(nn.Module):
 
 
     def sample_random_hidden_state_vector(self) -> torch.Tensor:
-        return .1 + .01 * torch.randn(self.n_neurons)
+        return .1 + .01 * torch.randn(self.n_neurons).to(self.device)
 
     def sample_random_hidden_state_batch(self) -> torch.Tensor:
-        return .1 + .01 * torch.randn(1, self.batch_size, self.n_neurons)
+        return .1 + .01 * torch.randn(1, self.batch_size, self.n_neurons).to(self.device)
 
 
     def init_hidden(self) -> None:
@@ -143,14 +143,19 @@ class RNNModule(nn.Module):
         return str(self.__dict__)
 
 
-class ModelOutput:
+class ModelOutput(nn.Module):
     def __init__(self, name: str, dim: int):
+        super().__init__()
+
         self.name = name
         self.dim = dim
         self.values = None
+
+        # needed for self.device
+        self.dummy_param = nn.Parameter(torch.empty(0))
     
     def reset(self, batch_size: int) -> None:
-        self.values = [torch.zeros(1, batch_size, self.dim)]
+        self.values = [torch.zeros(1, batch_size, self.dim).to(self.device)]
         
     def as_tensor(self) -> torch.Tensor:
         return torch.stack(self.values, dim = 1).squeeze(dim = 0)
@@ -158,5 +163,9 @@ class ModelOutput:
     #def __getitem__(self, item):
     #    return self.as_tensor()[item]
 
-    def __getattr__(self, name: str):
-        return getattr(self.as_tensor(), name)
+    #def __getattr__(self, name: str):
+    #    return getattr(self.as_tensor(), name)
+
+    @property
+    def device(self) -> torch.device:
+        return self.dummy_param.device

@@ -24,7 +24,7 @@ class MSEOnlyLoss(nn.Module):
         for output_name in self.output_names:
 
             mask = masks.get(output_name,
-                             torch.ones(model_outputs[output_name].shape))
+                             torch.ones(model_outputs[output_name].as_tensor().shape))
             #mask = masks[output_name] if output_name in masks else np.ones_like(model_outputs[output_name])
 
             error += mse(model_outputs[output_name].as_tensor() * mask, target_outputs[output_name] * mask)

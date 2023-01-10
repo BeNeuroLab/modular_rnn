@@ -66,10 +66,14 @@ def run_test_batch(model: MultiRegionRNN, task: Task) -> BatchResult:
     BatchResult namedtuple
     """
     trial_input, target_output, mask, trial_params = get_batch_of_trials(task, model)
-    model_output, rates = model(trial_input) # run the model on input x
+    model_outputs, rates = model(trial_input) # run the model on input x
 
     def _to_np(arr):
-        return arr.detach().cpu().numpy()
+        try:
+            return arr.detach().cpu().numpy()
+        # model_outputs is a list of ModelOutputs, not tensors
+        except AttributeError:
+            return arr.as_tensor().detach().cpu().numpy()
 
     def _convert(d):
         return {name : _to_np(arr)
@@ -79,7 +83,7 @@ def run_test_batch(model: MultiRegionRNN, task: Task) -> BatchResult:
                        _to_np(trial_input),
                        _convert(target_output),
                        _convert(mask),
-                       _convert(model_output),
+                       _convert(model_outputs),
                        _convert(rates))
 
 

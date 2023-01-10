@@ -73,7 +73,7 @@ def train(
         should return a single value
     clipgrad : float, default 1.
         gradient clipping norm
-    progress_bar : bool, default True
+    pbar : bool, default True
         draw progress bar
 
     Returns
@@ -97,7 +97,7 @@ def train(
         optimizer.zero_grad()
 
         batch_inputs, batch_outputs, batch_masks, batch_trial_params = get_batch_of_trials(task, rnn)
-        model_outputs, rates = rnn(batch_inputs)
+        model_outputs, rates = rnn(batch_inputs.to(rnn.device))
 
         train_loss = loss_fn(model_outputs, batch_outputs, batch_masks)
         train_loss.backward()

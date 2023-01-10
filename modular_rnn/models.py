@@ -21,7 +21,7 @@ class MultiRegionRNN(nn.Module):
 
         # TODO I might want to make the regions outside this
         # that way users can pass things that are not exactly RNNModules
-        self.regions: dict[str, RNNModule] = {}
+        self.regions = nn.ModuleDict()
 
         # update region parameter dicts with the default values
         default_region_init_params = {
@@ -43,19 +43,19 @@ class MultiRegionRNN(nn.Module):
 
                 self.regions[name] = RNNModule(name, **module_or_params)
             
-        self.outputs = {}
+        self.outputs = nn.ModuleDict()
         for (name, dimensionality) in outputs.items():
             self.outputs[name] = ModelOutput(name, dimensionality)
 
-        self.region_connections = []
+        self.region_connections = nn.ModuleList()
         for conn_config in connection_configs:
             self.create_region_connection(conn_config)
 
-        self.input_connections = []
+        self.input_connections = nn.ModuleList()
         for conn_config in input_configs:
             self.create_input_connection(conn_config)
 
-        self.output_connections = []
+        self.output_connections = nn.ModuleList()
         for conn_config in output_configs:
             self.create_output_connection(conn_config)
 
@@ -100,9 +100,9 @@ class MultiRegionRNN(nn.Module):
         
         for t in range(1, X.size(0)):
             for region in self.regions.values():
-                region.inputs_at_current_time = torch.zeros(1, self.batch_size, region.n_neurons)
+                region.inputs_at_current_time = torch.zeros(1, self.batch_size, region.n_neurons).to(self.device)
             for output in self.outputs.values():
-                output.values_at_current_time = torch.zeros(1, self.batch_size, output.dim)
+                output.values_at_current_time = torch.zeros(1, self.batch_size, output.dim).to(self.device)
                     
             for c in self.region_connections:
                 self.regions[c.target_name].inputs_at_current_time += self.regions[c.source_name].rates[t-1] @ c.effective_W.T
