@@ -83,7 +83,7 @@ class Connection(nn.Module):
         self.train_weights_direction = config.train_weights_direction
 
         self.p_conn = config.p_conn
-        self.mask = config.mask
+        self.register_buffer('mask', config.mask)
 
         if config.W is not None:
             self._W = config.W
@@ -115,7 +115,7 @@ class Connection(nn.Module):
             if self.norm is not None:
                 assert isinstance(self.norm, float)
                 import geotorch
-                geotorch.sphere(self, 'W', radius = self.norm)
+                geotorch.sphere(self, '_W', radius = self.norm)
 
         # TODO handle orthogonal and norm together
         # right now orthogonal makes the columns have unit norm
