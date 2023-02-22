@@ -9,7 +9,7 @@ def calc_cue_spread(arr: np.ndarray) -> float:
     return np.max(np.diff(np.sort(arr)))
 
 class CossinUncertaintyTaskWithReachProfiles(Task):
-    def __init__(self, dt, tau, T, N_batch, target_kappa=25, stim_noise=0.05, cue_kappas=(5, 50)):
+    def __init__(self, dt, tau, T, N_batch, target_kappa=25, stim_noise=0.05, cue_kappas=(5, 50), input_length=None):
 
         output_dims = {'hand' : 2,
                        'uncertainty' : 1}
@@ -23,6 +23,7 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
         self.stim_noise = stim_noise
         self.target_kappa = target_kappa
         self.cue_kappas = cue_kappas
+        self.input_length = input_length
         
     def generate_trial_params(self, batch, trial):
         params = dict()
@@ -57,9 +58,12 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
         input_signal = params['stim_noise'][time, :]
         
         # add the input after the target onset
-        #if params['idx_target_on'] <= time < params['idx_target_on']+20:
-        if params['idx_target_on'] <= time:
-            input_signal += params['cue_input']
+        if self.input_length is None:
+            if params['idx_target_on'] <= time:
+                input_signal += params['cue_input']
+        else:
+            if params['idx_target_on'] <= time < params['idx_target_on'] + self.input_length:
+                input_signal += params['cue_input']
 
         # go signal should be on after the go cue
         if time >= params['idx_go_cue']:
@@ -90,7 +94,7 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
 
 
 class CenterOutTaskWithReachProfiles(Task):
-    def __init__(self, dt, tau, T: int, N_batch: int, n_targets: int = 8, stim_noise=0.05):
+    def __init__(self, dt, tau, T: int, N_batch: int, n_targets: int = 8, stim_noise=0.05, input_length=None):
 
         output_dims = {'hand' : 2}
 
@@ -103,6 +107,7 @@ class CenterOutTaskWithReachProfiles(Task):
         self.stim_noise = stim_noise
         self.n_targets = n_targets
         self.targets = np.linspace(0, 2*np.pi, num = n_targets, endpoint = False)
+        self.input_length = input_length
         
     def generate_trial_params(self, batch, trial):
         params = dict()
@@ -130,9 +135,12 @@ class CenterOutTaskWithReachProfiles(Task):
         input_signal = params['stim_noise'][time, :]
         
         # add the input after the target onset
-        #if params['idx_target_on'] <= time < params['idx_target_on']+20:
-        if params['idx_target_on'] <= time:
-            input_signal += np.append(params['target_cossin'], 0)
+        if self.input_length is None:
+            if params['idx_target_on'] <= time:
+                input_signal += np.append(params['target_cossin'], 0)
+        else:
+            if params['idx_target_on'] <= time < params['idx_target_on']+self.input_length:
+                input_signal += np.append(params['target_cossin'], 0)
 
         # go signal should be on after the go cue
         if time >= params['idx_go_cue']:

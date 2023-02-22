@@ -5,7 +5,7 @@ import numpy as np
 from .reach_profile import extent_curve, speed_curve
 
 class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
-    def __init__(self, dt, tau, N_batch, stim_noise=0.05, cue_kappa=5):
+    def __init__(self, dt, tau, N_batch, stim_noise=0.05, cue_kappa=5, input_length=None):
         super().__init__(11,
                          {'hand' : 2, },
                          dt,
@@ -17,6 +17,7 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
         self.gap = self.estimate_gap(self.cue_kappa)
         self.trial_num = 0
         self.target_dirs = np.linspace(0, np.pi, self.N_batch)
+        self.input_length = input_length
 
     @staticmethod
     def estimate_gap(cue_kappa):
@@ -57,8 +58,12 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
         input_signal = params['stim_noise'][time, :]
         
         # add the input after the target onset
-        if time >= params['idx_target_on']:
-            input_signal += params['cue_input']
+        if self.input_length is None:
+            if time >= params['idx_target_on']:
+                input_signal += params['cue_input']
+        else:
+            if params['idx_target_on'] <= time < params['idx_target_on'] + self.input_length:
+                input_signal += params['cue_input']
 
         # go signal should be on after the go cue
         if time >= params['idx_go_cue']:
