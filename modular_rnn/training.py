@@ -99,7 +99,11 @@ def train(
         batch_inputs, batch_outputs, batch_masks, batch_trial_params = get_batch_of_trials(task, rnn)
         model_outputs, rates = rnn(batch_inputs.to(rnn.device))
 
-        train_loss = loss_fn(model_outputs, batch_outputs, batch_masks)
+        if loss_fn.pass_rnn:
+            train_loss = loss_fn(rnn, model_outputs, batch_outputs, batch_masks)
+        else:
+            train_loss = loss_fn(model_outputs, batch_outputs, batch_masks)
+
         train_loss.backward()
 
         torch.nn.utils.clip_grad_norm_(rnn.parameters(), clipgrad)

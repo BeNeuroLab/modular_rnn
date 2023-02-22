@@ -10,6 +10,8 @@ from .modules import ModelOutput
 mse = nn.MSELoss()
 
 class MSEOnlyLoss(nn.Module):
+    pass_rnn = False
+
     def __init__(self,
                  output_names: list[str]):
         super().__init__()
@@ -33,6 +35,8 @@ class MSEOnlyLoss(nn.Module):
         
         
 class TolerantLoss(nn.Module):
+    pass_rnn = False
+
     def __init__(self,
                  tolerance_in_deg: float,
                  direction_output_name: str):
@@ -59,4 +63,36 @@ class TolerantLoss(nn.Module):
         error = mse(angle_incorrect * torch.permute(dir_mask, (2, 0, 1)) * torch.permute(target_dir_output, (2, 0, 1)),
                     angle_incorrect * torch.permute(dir_mask, (2, 0, 1)) * torch.permute(model_dir_output, (2, 0, 1)))
         
+        return error
+
+
+class PoissonLoss(nn.Module):
+    pass_rnn = False
+
+    def __init__(self,
+                 output_names: list[str],
+                 log_input: bool = False):
+        super().__init__()
+        self.output_names = output_names
+        self.loss_fn = nn.PoissonNLLLoss(
+                log_input = log_input,
+                full = True,
+            )
+
+        # NOTE if log_input = True, the activation should be tanh scaled, else ReLU
+        
+    def forward(self,
+                model_outputs: dict[str, Union[np.ndarray, torch.Tensor]],
+                target_outputs: dict[str, np.ndarray],
+                masks: dict[str, Union[np.ndarray, torch.Tensor]]):
+
+        error = 0.
+        for output_name in self.output_names:
+
+            mask = masks.get(output_name,
+                             torch.ones(model_outputs[output_name].as_tensor().shape))
+            #mask = masks[output_name] if output_name in masks else np.ones_like(model_outputs[output_name])
+
+            error += self.loss_fn(model_outputs[output_name].as_tensor() * mask, target_outputs[output_name] * mask)
+
         return error
