@@ -86,9 +86,13 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
             masks_t['hand'] = np.ones(self.output_dims['hand'])
         else:
             masks_t['hand'] = np.zeros(self.output_dims['hand'])
+
+        if time > params['idx_target_on']:
+            masks_t['uncertainty'] = np.ones(self.output_dims['uncertainty'])
+        else:
+            masks_t['uncertainty'] = np.zeros(self.output_dims['uncertainty'])
             
         outputs_t['uncertainty'] = params['cue_var_log']
-        masks_t['uncertainty'] = 1.
 
         return input_signal, outputs_t, masks_t
 
