@@ -32,6 +32,7 @@ class MultiRegionRNN(nn.Module):
             'dynamics_noise' : dynamics_noise,
             'use_constant_init_state' : False,
             'train_recurrent_weights' : True,
+            'log_rate_init' : False,
         }
         for (name, module_or_params) in regions_config.items():
             if isinstance(module_or_params, RNNModule):

@@ -8,17 +8,21 @@ from .low_rank_utils import get_nm_from_W
 
 
 class RNNModule(nn.Module):
-    def __init__(self,
-                 name: str,
-                 n_neurons: int,
-                 alpha: float, 
-                 nonlin: callable,
-                 p_rec: float = 1.,
-                 rec_rank: Union[int, None] = None,
-                 train_recurrent_weights: bool = True, # TODO use this
-                 dynamics_noise: Union[float, None] = None,
-                 bias: bool = True,
-                 use_constant_init_state: bool = False):
+    def __init__(
+            self,
+            name: str,
+            n_neurons: int,
+            alpha: float, 
+            nonlin: callable,
+            p_rec: float = 1.,
+            rec_rank: Union[int, None] = None,
+            train_recurrent_weights: bool = True, # TODO use this
+            dynamics_noise: Union[float, None] = None,
+            bias: bool = True,
+            use_constant_init_state: bool = False,
+            log_rate_init: bool = False,
+            allow_self_connections: bool = True,
+        ):
         super().__init__()
 
         self.name = name
@@ -31,6 +35,9 @@ class RNNModule(nn.Module):
         self.use_constant_init_state = use_constant_init_state
         self.train_recurrent_weights = train_recurrent_weights
 
+        self.allow_self_connections = allow_self_connections
+        if not allow_self_connections:
+            self.register_buffer('diag_mask', 1 - torch.eye(n_neurons))
 
         if dynamics_noise is None:
             self.noisy = False
@@ -47,18 +54,23 @@ class RNNModule(nn.Module):
             self.rec_rank = 'full'
             self.full_rank = True
 
+        # initialize weights
         self.glorot_gauss_init()
 
+        if log_rate_init:
+            self.init_x_mean = -5.
+        else:
+            self.init_x_mean = .1
         # for potentially initializing to the same state in every trial
         init_x = self.sample_random_hidden_state_vector()
         self.register_buffer('init_x', init_x)
 
 
     def sample_random_hidden_state_vector(self) -> torch.Tensor:
-        return .1 + .01 * torch.randn(self.n_neurons).to(self.device)
+        return self.init_x_mean + .01 * torch.randn(self.n_neurons).to(self.device)
 
     def sample_random_hidden_state_batch(self) -> torch.Tensor:
-        return .1 + .01 * torch.randn(1, self.batch_size, self.n_neurons).to(self.device)
+        return self.init_x_mean + .01 * torch.randn(1, self.batch_size, self.n_neurons).to(self.device)
 
 
     def init_hidden(self) -> None:
@@ -67,7 +79,6 @@ class RNNModule(nn.Module):
         else:
             init_state = self.sample_random_hidden_state_batch()
 
-        # NOTE might need self.device
         self.hidden_states = [init_state]
         self.rates = [self.nonlin(init_state)]
 
@@ -99,6 +110,12 @@ class RNNModule(nn.Module):
 
 
     def glorot_gauss_init(self) -> None:
+        """
+        Initialize recurrent weights and biases using the Glorot-Gauss initialization
+        Should be similar to https://pytorch.org/docs/stable/_modules/torch/nn/init.html#xavier_normal_
+
+        See docstring of glorot_gauss_tensor
+        """
         rec_mask = torch.rand(self.n_neurons, self.n_neurons) < self.p_rec
         self.register_buffer('rec_mask', rec_mask)
 
@@ -119,10 +136,15 @@ class RNNModule(nn.Module):
     @property
     def W_rec(self):
         if self.full_rank:
-            return self._W_rec
+            _W_rec = self._W_rec
         else:
             #return self.n @ self.m.t()
-            return self.m @ self.n.t()
+            _W_rec = self.m @ self.n.t()
+
+        if self.allow_self_connections:
+            return _W_rec
+        else:
+            return self.diag_mask * _W_rec
 
     def reparametrize_with_svd(self):
         self.n, self.m = get_nm_from_W(self.W_rec, self.rec_rank)
