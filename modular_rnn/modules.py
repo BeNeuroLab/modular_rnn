@@ -16,7 +16,7 @@ class RNNModule(nn.Module):
             nonlin: callable,
             p_rec: float = 1.,
             rec_rank: Union[int, None] = None,
-            train_recurrent_weights: bool = True, # TODO use this
+            train_recurrent_weights: bool = True,
             dynamics_noise: Union[float, None] = None,
             bias: bool = True,
             hidden_state_init_mode: str = 'zero',
@@ -137,18 +137,20 @@ class RNNModule(nn.Module):
         self.register_buffer('rec_mask', rec_mask)
 
         if self.full_rank:
-            self._W_rec = nn.Parameter(glorot_gauss_tensor(connectivity=rec_mask))
+            self._W_rec = nn.Parameter(glorot_gauss_tensor(connectivity=rec_mask),
+                                       requires_grad = self.train_recurrent_weights)
         else:
             _n, _m = get_nm_from_W(glorot_gauss_tensor(connectivity=rec_mask),
                                    self.rec_rank)
-            self.n = nn.Parameter(_n)
-            self.m = nn.Parameter(_m)
+            self.n = nn.Parameter(_n, requires_grad = self.train_recurrent_weights)
+            self.m = nn.Parameter(_m, requires_grad = self.train_recurrent_weights)
 
         if self.bias:
-            self.bias = nn.Parameter(glorot_gauss_tensor((1, self.n_neurons)))
+            self.bias = nn.Parameter(glorot_gauss_tensor((1, self.n_neurons)),
+                                     requires_grad = True)
         else:
-            self.bias = nn.Parameter(torch.zeros((1, self.n_neurons)))
-            self.bias.requires_grad = False
+            self.bias = nn.Parameter(torch.zeros((1, self.n_neurons)),
+                                     requires_grad = False)
 
     @property
     def W_rec(self):
