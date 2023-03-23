@@ -1,7 +1,7 @@
 import torch
 
 
-def get_nm_from_W(W: torch.Tensor, rank: int) -> tuple[torch.Tensor]:
+def get_nm_from_W(W: torch.Tensor, rank: int) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Orthogonalize m and n via SVD
 

@@ -6,7 +6,7 @@ Array_or_Tensor = Union[np.ndarray, torch.Tensor]
 
 
 def glorot_gauss_tensor(
-        shape: tuple[int] = None,
+        shape: tuple[int, int] = None,
         connectivity: Union[np.ndarray, torch.Tensor] = None
         ):
     """

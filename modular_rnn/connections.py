@@ -126,7 +126,7 @@ class Connection(nn.Module):
         #    geotorch.orthogonal(self, 'W')
 
     @property
-    def W(self):
+    def W(self) -> torch.Tensor:
         if self.full_rank:
             return self._W
         else:
