@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from .connections import ConnectionConfig, Connection
-from .modules import RNNModule, ModelOutput
+from .modules import RNNModule, ModelOutput, ODEModule
 
 class MultiRegionRNN(nn.Module):
     def __init__(self,
@@ -35,8 +35,10 @@ class MultiRegionRNN(nn.Module):
             'log_rate_init' : False,
         }
         for (name, module_or_params) in regions_config.items():
-            if isinstance(module_or_params, RNNModule):
+            # if the value is a module, we just use it as it is
+            if isinstance(module_or_params, (RNNModule, ODEModule)):
                 self.regions[name] = module_or_params
+            # if it's a dict of parameters, we have to instantiate a module
             else:
                 assert isinstance(module_or_params, dict)
                 for (param_name, param_val) in default_region_init_params.items():
@@ -66,8 +68,8 @@ class MultiRegionRNN(nn.Module):
         assert conn_config.target_name in self.regions.keys()
         
         self.region_connections.append(Connection(conn_config,
-                                                  self.regions[conn_config.source_name].n_neurons,
-                                                  self.regions[conn_config.target_name].n_neurons))
+                                                  self.regions[conn_config.source_name].source_dim,
+                                                  self.regions[conn_config.target_name].target_dim))
         
 
     def create_input_connection(self, conn_config: ConnectionConfig):
@@ -75,7 +77,7 @@ class MultiRegionRNN(nn.Module):
         
         self.input_connections.append(Connection(conn_config,
                                                  self.input_dim,
-                                                 self.regions[conn_config.target_name].n_neurons))
+                                                 self.regions[conn_config.target_name].target_dim))
         
 
     def create_output_connection(self, conn_config: ConnectionConfig):
@@ -83,7 +85,7 @@ class MultiRegionRNN(nn.Module):
         assert conn_config.target_name in self.outputs.keys()
         
         self.output_connections.append(Connection(conn_config,
-                                                  self.regions[conn_config.source_name].n_neurons,
+                                                  self.regions[conn_config.source_name].source_dim,
                                                   self.outputs[conn_config.target_name].dim))
     
     
@@ -92,7 +94,6 @@ class MultiRegionRNN(nn.Module):
         for region in self.regions.values():
             region.batch_size = self.batch_size
 
-        # NOTE I might run into problems with device
         for region in self.regions.values():
             region.init_hidden()
             
@@ -101,13 +102,14 @@ class MultiRegionRNN(nn.Module):
         
         for t in range(1, X.size(0)):
             for region in self.regions.values():
-                region.inputs_at_current_time = torch.zeros(1, self.batch_size, region.n_neurons).to(self.device)
+                region.inputs_at_current_time = torch.zeros(1, self.batch_size, region.target_dim).to(self.device)
             for output in self.outputs.values():
                 output.values_at_current_time = torch.zeros(1, self.batch_size, output.dim).to(self.device)
                     
             for c in self.region_connections:
                 self.regions[c.target_name].inputs_at_current_time += self.regions[c.source_name].rates[t-1] @ c.effective_W.T
             for c in self.input_connections:
+                # TODO do I want external input at t or t-1?
                 self.regions[c.target_name].inputs_at_current_time += X[t] @ c.effective_W.T
                 
             for region in self.regions.values():
