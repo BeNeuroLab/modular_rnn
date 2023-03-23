@@ -30,9 +30,8 @@ class MultiRegionRNN(nn.Module):
             'p_rec' : 1., 
             'rec_rank' : None,
             'dynamics_noise' : dynamics_noise,
-            'use_constant_init_state' : False,
+            'hidden_state_init_mode' : 'zero',
             'train_recurrent_weights' : True,
-            'log_rate_init' : False,
         }
         for (name, module_or_params) in regions_config.items():
             # if the value is a module, we just use it as it is

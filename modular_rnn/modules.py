@@ -19,8 +19,7 @@ class RNNModule(nn.Module):
             train_recurrent_weights: bool = True, # TODO use this
             dynamics_noise: Union[float, None] = None,
             bias: bool = True,
-            use_constant_init_state: bool = False,
-            log_rate_init: bool = False,
+            hidden_state_init_mode: str = 'zero',
             allow_self_connections: bool = True,
         ):
         super().__init__()
@@ -32,7 +31,6 @@ class RNNModule(nn.Module):
         self.p_rec = p_rec
         self.nonlin_fn = nonlin
         self.bias = bias
-        self.use_constant_init_state = use_constant_init_state
         self.train_recurrent_weights = train_recurrent_weights
 
         self.allow_self_connections = allow_self_connections
@@ -57,27 +55,40 @@ class RNNModule(nn.Module):
         # initialize weights
         self.glorot_gauss_init()
 
-        if log_rate_init:
-            self.init_x_mean = -5.
-        else:
-            self.init_x_mean = .1
-        # for potentially initializing to the same state in every trial
+        # set strategy to initialize hidden states
+        assert hidden_state_init_mode in ('zero', 'constant', 'random')
+        self.hidden_state_init_mode = hidden_state_init_mode
+
+        # for potentially initializing to the same nonzero state in every trial
         init_x = self.sample_random_hidden_state_vector()
         self.register_buffer('init_x', init_x)
 
 
     def sample_random_hidden_state_vector(self) -> torch.Tensor:
-        return self.init_x_mean + .01 * torch.randn(self.n_neurons).to(self.device)
+        """
+        Sample a single random hidden state value for each neuron.
+        """
+        return .01 * torch.randn(self.n_neurons).to(self.device)
 
     def sample_random_hidden_state_batch(self) -> torch.Tensor:
-        return self.init_x_mean + .01 * torch.randn(1, self.batch_size, self.n_neurons).to(self.device)
+        """
+        Sample a random hidden state value for each neuron on each trial of the batch.
+        """
+        return .01 * torch.randn(1, self.batch_size, self.n_neurons).to(self.device)
 
 
     def init_hidden(self) -> None:
-        if self.use_constant_init_state:
+        """
+        Initialize hidden states and rates for a batch of trials.
+        """
+        if self.hidden_state_init_mode == 'zero':
+            init_state = torch.zeros(1, self.batch_size, self.n_neurons).to(self.device)
+        elif self.hidden_state_init_mode == 'constant':
             init_state = torch.tile(self.init_x, (1, self.batch_size, 1))
-        else:
+        elif self.hidden_state_init_mode == 'random':
             init_state = self.sample_random_hidden_state_batch()
+        else:
+            raise ValueError("hidden_state_init_mode has to be one of 'zero', 'constant', 'random'")
 
         self.hidden_states = [init_state]
         self.rates = [self.nonlin(init_state)]
@@ -101,11 +112,17 @@ class RNNModule(nn.Module):
 
 
     def get_hidden_states_tensor(self) -> torch.Tensor:
+        """
+        Stack the list of hidden states into a tensor of shape (n_timesteps, batch_size, n_neurons)
+        """
         return torch.stack(self.hidden_states, dim = 1).squeeze(dim = 0)
 
 
     @property
     def rates_tensor(self) -> torch.Tensor:
+        """
+        Stack the list of rates into a tensor of shape (n_timesteps, batch_size, n_neurons)
+        """
         return torch.stack(self.rates, dim = 1).squeeze(dim = 0)
 
 
