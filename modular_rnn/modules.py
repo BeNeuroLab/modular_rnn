@@ -171,7 +171,7 @@ class RNNModule(nn.Module):
     def source_dim(self) -> int:
         return self.n_neurons
 
-    def reparametrize_with_svd(self):
+    def reparametrize_with_svd(self) -> None:
         self.n, self.m = get_nm_from_W(self.W_rec, self.rec_rank)
 
     @property
@@ -186,7 +186,7 @@ class RNNModule(nn.Module):
     def norm_rec(self) -> torch.Tensor:
         return (self.rec_mask * self.W_rec).norm()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.__dict__)
 
 
