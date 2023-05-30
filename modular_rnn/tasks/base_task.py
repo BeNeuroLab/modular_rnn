@@ -27,14 +27,14 @@ class Task(ABC):
 
     """
     def __init__(self,
-                 N_in: int,
+                 input_dims: dict[str, int],
                  output_dims: dict[str, int],
                  dt: float,
                  tau: float,
                  T: float,
                  N_batch: int):
         self.N_batch = N_batch
-        self.N_in = N_in
+        self.input_dims = input_dims
         self.output_dims = output_dims
         self.dt = dt
         self.tau = tau
@@ -140,22 +140,30 @@ class Task(ABC):
             - trial_masks : dict[str, (*ndarray(dtype=bool, shape=(*:attr:`N_steps`, :attr:`N_out` *))*)]
                 True during steps where the network should train to match :data:`y`, False where the network should ignore :data:`y` during training.
         """
-        x_data = np.zeros([self.N_steps, self.N_in])
-        trial_outputs = {output_name : np.zeros((self.N_steps, N_out))
-                         for (output_name, N_out) in self.output_dims.items()}
-        trial_masks = {output_name : np.zeros((self.N_steps, N_out))
-                       for (output_name, N_out) in self.output_dims.items()}
+        trial_inputs = {
+            input_name : np.zeros((self.N_steps, N_in))
+            for (input_name, N_in) in self.input_dims.items()
+        }
+        trial_outputs = {
+            output_name : np.zeros((self.N_steps, N_out))
+            for (output_name, N_out) in self.output_dims.items()
+        }
+        trial_masks = {
+            output_name : np.zeros((self.N_steps, N_out))
+            for (output_name, N_out) in self.output_dims.items()
+        }
 
         for t in range(self.N_steps):
-            x_t, outputs_t, masks_t = self.trial_function(t * self.dt, params)
+            inputs_t, outputs_t, masks_t = self.trial_function(t * self.dt, params)
 
-            x_data[t, :] = x_t
+            for input_name in self.input_dims.keys():
+                trial_inputs[input_name][t, :] = inputs_t[input_name]
 
             for output_name in self.output_dims.keys():
                 trial_outputs[output_name][t, :] = outputs_t[output_name]
                 trial_masks[output_name][t, :] = masks_t[output_name]
 
-        return x_data, trial_outputs, trial_masks
+        return trial_inputs, trial_outputs, trial_masks
 
     def batch_generator(self):
         """ Generates a batch of trials.

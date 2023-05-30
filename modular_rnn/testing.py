@@ -12,7 +12,7 @@ from .tasks.base_task import Task
 @dataclasses.dataclass
 class BatchResult:
     trial_params:  list[dict]
-    trial_input:   np.ndarray
+    trial_input:   dict[str, np.ndarray]
     target_output: dict[str, np.ndarray]
     mask:          dict[str, np.ndarray]
     model_output:  dict[str, np.ndarray]
@@ -34,8 +34,9 @@ class BatchResult:
         """
         dfi = pd.DataFrame.from_records(self.trial_params)
 
-        dfi['trial_input'] = [si for si in self.trial_input.transpose(1, 0, 2)]
-
+        for (input_name, input_value) in self.trial_input.items():
+            dfi[f'{input_name}_input'] = [si for si in input_value.transpose(1, 0, 2)]
+ 
         for fieldname in ['target_output', 'model_output']:
             for (output_name, output_value) in getattr(self, fieldname).items():
                 dfi[output_name + '_' + fieldname] = [si for si in output_value.transpose(1, 0, 2)]
@@ -80,7 +81,7 @@ def run_test_batch(model: MultiRegionRNN, task: Task) -> BatchResult:
                 for (name, arr) in d.items()}
     
     return BatchResult(trial_params,
-                       _to_np(trial_input),
+                       _convert(trial_input),
                        _convert(target_output),
                        _convert(mask),
                        _convert(model_outputs),

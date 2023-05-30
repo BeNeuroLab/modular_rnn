@@ -140,8 +140,15 @@ class RNNModule(nn.Module):
             self._W_rec = nn.Parameter(glorot_gauss_tensor(connectivity=rec_mask),
                                        requires_grad = self.train_recurrent_weights)
         else:
-            _n, _m = get_nm_from_W(glorot_gauss_tensor(connectivity=rec_mask),
-                                   self.rec_rank)
+            # this is how I did it originally
+            #_n, _m = get_nm_from_W(glorot_gauss_tensor(connectivity=rec_mask),
+            #                       self.rec_rank)
+
+            # using 1 / n_neurons instead of 2 / (2 * n_neurons)
+            # NOTE doesn't care about rec_mask yet
+            _n = torch.randn(self.n_neurons, self.rec_rank) * torch.sqrt(torch.tensor(1. / self.n_neurons))
+            _m = torch.randn(self.n_neurons, self.rec_rank) * torch.sqrt(torch.tensor(1. / self.n_neurons))
+
             self.n = nn.Parameter(_n, requires_grad = self.train_recurrent_weights)
             self.m = nn.Parameter(_m, requires_grad = self.train_recurrent_weights)
 

@@ -6,12 +6,25 @@ from .reach_profile import extent_curve, speed_curve
 
 class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
     def __init__(self, dt, tau, N_batch, stim_noise=0.05, cue_kappa=5, input_length=None):
-        super().__init__(11,
-                         {'hand' : 2, },
-                         dt,
-                         tau,
-                         1200,
-                         N_batch)
+
+        input_dims = {
+            'cue_slices_cossin' : 10,
+            'go_cue' : 1,
+        }
+
+        output_dims = {
+            'hand' : 2,
+            #'uncertainty' : 1
+        }
+
+        super().__init__(
+            input_dims,
+            output_dims,
+            dt,
+            tau,
+            1200,
+            N_batch
+        )
         self.stim_noise = stim_noise
         self.cue_kappa = cue_kappa
         self.gap = self.estimate_gap(self.cue_kappa)
@@ -44,8 +57,13 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
         params['idx_go_cue']      = params['idx_target_on'] + 300
         params['idx_trial_end']   = params['idx_go_cue'] + 450
         
-        params['stim_noise'] = self.stim_noise * np.random.randn(self.T, self.N_in)
-        params['cue_input'] = np.array([np.cos(ang) for ang in params['cue_slice_locations']] + [np.sin(ang) for ang in params['cue_slice_locations']] + [0.])
+        params['cue_input'] = np.array([np.cos(ang) for ang in params['cue_slice_locations']] +
+                                       [np.sin(ang) for ang in params['cue_slice_locations']])
+
+        params['stim_noise'] = {
+            input_name : self.stim_noise * np.random.randn(self.T, input_dim)
+            for (input_name, input_dim) in self.input_dims.items()
+        }
 
         self.trial_num += 1
 
@@ -55,22 +73,26 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
         target_cossin = params['target_cossin']
         
         # start with just noise
-        input_signal = params['stim_noise'][time, :]
+        inputs_t = {}
+        outputs_t = {}
+        masks_t = {}
         
         # add the input after the target onset
+        inputs_t['cue_slices_cossin'] = params['stim_noise']['cue_slices_cossin'][time, :]
         if self.input_length is None:
             if time >= params['idx_target_on']:
-                input_signal += params['cue_input']
+                inputs_t['cue_slices_cossin'] += params['cue_input']
         else:
             if params['idx_target_on'] <= time < params['idx_target_on'] + self.input_length:
-                input_signal += params['cue_input']
+                inputs_t['cue_slices_cossin'] += params['cue_input']
 
         # go signal should be on after the go cue
         if time >= params['idx_go_cue']:
-            input_signal += np.append(np.zeros(10), 1)
+            inputs_t['go_cue'] = 1 + params['stim_noise']['go_cue'][time, :]
+        else:
+            inputs_t['go_cue'] = 0 + params['stim_noise']['go_cue'][time, :]
             
         # in the beginning the output is nothing, then it's the mean position or velocity profile
-        outputs_t = {}
         if time < params['idx_go_cue']:
             outputs_t['hand'] = np.zeros(self.output_dims['hand'])
         else:
@@ -81,7 +103,6 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
             outputs_t['hand'] = target_cossin * extent_at_t
             
         # we always care about correct position
-        masks_t = {}
         if time > params['idx_trial_start']:
             masks_t['hand'] = np.ones(self.output_dims['hand'])
         else:
@@ -89,4 +110,4 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
             
         masks_t['uncertainty'] = 1.
             
-        return input_signal, outputs_t, masks_t
+        return inputs_t, outputs_t, masks_t

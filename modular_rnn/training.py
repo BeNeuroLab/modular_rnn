@@ -16,26 +16,29 @@ def get_batch_of_trials(task, rnn):
     batch_inputs, batch_outputs, batch_masks, trial_params = task.get_trial_batch()
     # get them to PyTorch's preferred shape and put them to the device the model is on
 
+    collected_inputs = {input_name : [] for input_name in task.input_dims.keys()}
     collected_outputs = {output_name : [] for output_name in task.output_dims.keys()}
     collected_masks = {output_name : [] for output_name in task.output_dims.keys()}
 
-    batch_inputs = torch.tensor(np.array(batch_inputs), dtype = torch.float).transpose(1, 0).to(rnn.device)
+    for trial_inputs in batch_inputs:
+        for (input_name, input_value) in trial_inputs.items():
+            collected_inputs[input_name].append(input_value)
+    for (input_name, input_value) in collected_inputs.items():
+        collected_inputs[input_name] = torch.tensor(np.array(input_value), dtype = torch.float).transpose(1, 0).to(rnn.device)
 
     for trial_outputs in batch_outputs:
         for (output_name, output_value) in trial_outputs.items():
             collected_outputs[output_name].append(output_value)
-
     for (output_name, output_value) in collected_outputs.items():
         collected_outputs[output_name] = torch.tensor(np.array(output_value), dtype = torch.float).transpose(1, 0).to(rnn.device)
 
     for trial_mask in batch_masks:
         for (output_name, mask_value) in trial_mask.items():
             collected_masks[output_name].append(mask_value)
-
     for (output_name, mask_value) in collected_masks.items():
         collected_masks[output_name] = torch.tensor(np.array(mask_value), dtype = torch.float).transpose(1, 0).to(rnn.device)
         
-    return batch_inputs, collected_outputs, collected_masks, trial_params
+    return collected_inputs, collected_outputs, collected_masks, trial_params
 
 
 def train(
@@ -97,7 +100,7 @@ def train(
         optimizer.zero_grad()
 
         batch_inputs, batch_outputs, batch_masks, batch_trial_params = get_batch_of_trials(task, rnn)
-        model_outputs, rates = rnn(batch_inputs.to(rnn.device))
+        model_outputs, rates = rnn(batch_inputs)
 
         if loss_fn.pass_rnn:
             train_loss = loss_fn(rnn, model_outputs, batch_outputs, batch_masks)

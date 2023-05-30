@@ -4,10 +4,12 @@ import torch.nn as nn
 from .connections import ConnectionConfig, Connection
 from .modules import RNNModule, ModelOutput, ODEModule
 
+import warnings
+
 class MultiRegionRNN(nn.Module):
     def __init__(self,
-                 input_dim: int,
-                 outputs: dict[str, int],
+                 input_dims: dict[str, int],
+                 output_dims: dict[str, int],
                  alpha: float,
                  nonlin: callable,
                  regions_config: dict,
@@ -18,11 +20,7 @@ class MultiRegionRNN(nn.Module):
                  dynamics_noise: float = None):
         super().__init__()
 
-        self.input_dim = input_dim
-
-        # TODO I might want to make the regions outside this
-        # that way users can pass things that are not exactly RNNModules
-        self.regions = nn.ModuleDict()
+        self.input_dims = input_dims
 
         # update region parameter dicts with the default values
         default_region_init_params = {
@@ -34,6 +32,8 @@ class MultiRegionRNN(nn.Module):
             'hidden_state_init_mode' : 'zero',
             'train_recurrent_weights' : True,
         }
+
+        self.regions = nn.ModuleDict()
         for (name, module_or_params) in regions_config.items():
             # if the value is a module, we just use it as it is
             if isinstance(module_or_params, (RNNModule, ODEModule)):
@@ -47,7 +47,7 @@ class MultiRegionRNN(nn.Module):
                 self.regions[name] = RNNModule(name, **module_or_params)
             
         self.outputs = nn.ModuleDict()
-        for (name, dimensionality) in outputs.items():
+        for (name, dimensionality) in output_dims.items():
             self.outputs[name] = ModelOutput(name, dimensionality)
 
         self.region_connections = nn.ModuleList()
@@ -66,6 +66,11 @@ class MultiRegionRNN(nn.Module):
         for conn_config in feedback_configs:
             self.create_feedback_connection(conn_config)
 
+        # check if there are potentially unused input dimensions
+        for input_name in self.input_dims.keys():
+            if input_name not in [x.source_name for x in input_configs]:
+                warnings.warn(f'Input {input_name} is not connected to any region.')
+
 
     def create_region_connection(self, conn_config: ConnectionConfig):
         assert conn_config.source_name in self.regions.keys()
@@ -77,10 +82,11 @@ class MultiRegionRNN(nn.Module):
         
 
     def create_input_connection(self, conn_config: ConnectionConfig):
-        assert conn_config.target_name in self.regions.keys()
+        assert conn_config.source_name in self.input_dims.keys(), "Input source was not specified in `input_dims`"
+        assert conn_config.target_name in self.regions.keys(), "Target area is not in `self.regions`"
         
         self.input_connections.append(Connection(conn_config,
-                                                 self.input_dim,
+                                                 self.input_dims[conn_config.source_name],
                                                  self.regions[conn_config.target_name].target_dim))
         
 
@@ -101,8 +107,12 @@ class MultiRegionRNN(nn.Module):
                                                     self.regions[conn_config.target_name].target_dim))
     
 
-    def forward(self, X: torch.Tensor):
-        self.batch_size = X.size(1)
+    def forward(self, inputs: dict[str, torch.Tensor]):
+        # all inputs should have the same batch size
+        assert len({X.size(1) for X in inputs.values()}) == 1
+
+        T, self.batch_size, _ = next(iter(inputs.values())).shape
+
         for region in self.regions.values():
             region.batch_size = self.batch_size
 
@@ -112,7 +122,7 @@ class MultiRegionRNN(nn.Module):
         for output in self.outputs.values():
             output.reset(self.batch_size)
         
-        for t in range(1, X.size(0)):
+        for t in range(1, T):
             for region in self.regions.values():
                 region.inputs_at_current_time = torch.zeros(1, self.batch_size, region.target_dim).to(self.device)
             for output in self.outputs.values():
@@ -122,7 +132,7 @@ class MultiRegionRNN(nn.Module):
                 self.regions[c.target_name].inputs_at_current_time += self.regions[c.source_name].rates[t-1] @ c.effective_W.T
             for c in self.input_connections:
                 # TODO do I want external input at t or t-1?
-                self.regions[c.target_name].inputs_at_current_time += X[t] @ c.effective_W.T
+                self.regions[c.target_name].inputs_at_current_time += inputs[c.source_name][t-1] @ c.effective_W.T
             for c in self.feedback_connections:
                 self.regions[c.target_name].inputs_at_current_time += self.outputs[c.source_name].values[t-1] @ c.effective_W.T
                 
