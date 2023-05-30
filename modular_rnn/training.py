@@ -84,8 +84,8 @@ def train(
     if optimizer is None:
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, rnn.parameters()))
 
-    if test_loss_fn is None:
-        test_loss_fn = loss_fn
+    if test_loss_fn is not None:
+        raise NotImplementedError
 
     try:
         progress_bar = tqdm(range(training_iters), display=pbar)
