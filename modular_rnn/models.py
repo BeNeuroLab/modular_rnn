@@ -14,6 +14,7 @@ class MultiRegionRNN(nn.Module):
                  connection_configs: list[ConnectionConfig],
                  input_configs: list[ConnectionConfig],
                  output_configs: list[ConnectionConfig],
+                 feedback_configs: list[ConnectionConfig],
                  dynamics_noise: float = None):
         super().__init__()
 
@@ -61,6 +62,10 @@ class MultiRegionRNN(nn.Module):
         for conn_config in output_configs:
             self.create_output_connection(conn_config)
 
+        self.feedback_connections = nn.ModuleList()
+        for conn_config in feedback_configs:
+            self.create_feedback_connection(conn_config)
+
 
     def create_region_connection(self, conn_config: ConnectionConfig):
         assert conn_config.source_name in self.regions.keys()
@@ -86,8 +91,16 @@ class MultiRegionRNN(nn.Module):
         self.output_connections.append(Connection(conn_config,
                                                   self.regions[conn_config.source_name].source_dim,
                                                   self.outputs[conn_config.target_name].dim))
+
+
+    def create_feedback_connection(self, conn_config: ConnectionConfig):
+        assert conn_config.source_name in self.outputs.keys()
+        assert conn_config.target_name in self.regions.keys()
+        self.feedback_connections.append(Connection(conn_config,
+                                                    self.outputs[conn_config.source_name].dim,
+                                                    self.regions[conn_config.target_name].target_dim))
     
-    
+
     def forward(self, X: torch.Tensor):
         self.batch_size = X.size(1)
         for region in self.regions.values():
@@ -110,6 +123,8 @@ class MultiRegionRNN(nn.Module):
             for c in self.input_connections:
                 # TODO do I want external input at t or t-1?
                 self.regions[c.target_name].inputs_at_current_time += X[t] @ c.effective_W.T
+            for c in self.feedback_connections:
+                self.regions[c.target_name].inputs_at_current_time += self.outputs[c.source_name].values[t-1] @ c.effective_W.T
                 
             for region in self.regions.values():
                 region.f_step()
@@ -129,7 +144,7 @@ class MultiRegionRNN(nn.Module):
             for p in region.parameters():
                 yield p
 
-        for conn_list in (self.input_connections, self.region_connections, self.output_connections):
+        for conn_list in (self.input_connections, self.region_connections, self.output_connections, self.feedback_connections):
             for conn in conn_list:
                 for p in conn.parameters():
                     yield p
