@@ -6,9 +6,8 @@ Array_or_Tensor = Union[np.ndarray, torch.Tensor]
 
 
 def glorot_gauss_tensor(
-        shape: tuple[int, int] = None,
-        connectivity: Union[np.ndarray, torch.Tensor] = None
-        ):
+    shape: tuple[int, int] = None, connectivity: Union[np.ndarray, torch.Tensor] = None
+):
     """
     Adapted from PsychRNN: https://github.com/murraylab/PsychRNN/blob/master/psychrnn/backend/initializations.py
 
@@ -35,9 +34,10 @@ def glorot_gauss_tensor(
         connectivity = torch.ones(shape)
 
     init = torch.zeros(connectivity.shape)
-    fan_in = connectivity.sum(axis = 1)
+    fan_in = connectivity.sum(axis=1)
     init += torch.tile(fan_in, (connectivity.shape[1], 1)).T
-    fan_out = connectivity.sum(axis = 0)
+    fan_out = connectivity.sum(axis=0)
     init += torch.tile(fan_out, (connectivity.shape[0], 1))
 
+    # TODO the variance should depend on the activation function used
     return torch.normal(0, torch.sqrt(2 / init))

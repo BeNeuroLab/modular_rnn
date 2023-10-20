@@ -5,12 +5,12 @@ from abc import ABC, abstractmethod
 
 
 class Task(ABC):
-    """ The base task class.
+    """The base task class.
 
     The base task class provides the structure that users can use to define a new task.
 
     Note:
-        The base task class is not itself a functioning task. 
+        The base task class is not itself a functioning task.
         The generate_trial_params and trial_function must be defined to define a new, functioning, task.
 
     Args:
@@ -23,16 +23,19 @@ class Task(ABC):
 
     Inferred Parameters:
         * **alpha** (*float*) -- The number of unit time constants per simulation timestep.
-        * **N_steps** (*int*): The number of simulation timesteps in a trial. 
+        * **N_steps** (*int*): The number of simulation timesteps in a trial.
 
     """
-    def __init__(self,
-                 input_dims: dict[str, int],
-                 output_dims: dict[str, int],
-                 dt: float,
-                 tau: float,
-                 T: float,
-                 N_batch: int):
+
+    def __init__(
+        self,
+        input_dims: dict[str, int],
+        output_dims: dict[str, int],
+        dt: float,
+        tau: float,
+        T: float,
+        N_batch: int,
+    ):
         self.N_batch = N_batch
         self.input_dims = input_dims
         self.output_dims = output_dims
@@ -43,7 +46,6 @@ class Task(ABC):
         self.alpha = (1.0 * self.dt) / self.tau
         self.N_steps = int(np.ceil(self.T / self.dt))
 
-    
     @abstractmethod
     def generate_trial_params(self, batch_num: int, trial_num: int):
         """
@@ -66,7 +68,6 @@ class Task(ABC):
             This function is abstract and must be implemented in a child Task object.
         """
         pass
-
 
     @abstractmethod
     def trial_function(self, time: int, params: dict):
@@ -97,7 +98,6 @@ class Task(ABC):
         """
         pass
 
-    
     def accuracy_function(self, correct_output, test_output, output_mask):
         """ Function to calculate accuracy (not loss) as it would be measured experimentally.
 
@@ -141,15 +141,15 @@ class Task(ABC):
                 True during steps where the network should train to match :data:`y`, False where the network should ignore :data:`y` during training.
         """
         trial_inputs = {
-            input_name : np.zeros((self.N_steps, N_in))
+            input_name: np.zeros((self.N_steps, N_in))
             for (input_name, N_in) in self.input_dims.items()
         }
         trial_outputs = {
-            output_name : np.zeros((self.N_steps, N_out))
+            output_name: np.zeros((self.N_steps, N_out))
             for (output_name, N_out) in self.output_dims.items()
         }
         trial_masks = {
-            output_name : np.zeros((self.N_steps, N_out))
+            output_name: np.zeros((self.N_steps, N_out))
             for (output_name, N_out) in self.output_dims.items()
         }
 
@@ -166,7 +166,7 @@ class Task(ABC):
         return trial_inputs, trial_outputs, trial_masks
 
     def batch_generator(self):
-        """ Generates a batch of trials.
+        """Generates a batch of trials.
 
         Returns:
             Generator[tuple, None, None]:
@@ -182,12 +182,11 @@ class Task(ABC):
                 Output mask for :attr:`N_batch` trials. True when the network should aim to match the target output, False when the target output can be ignored.
             * trial_params (*ndarray(dtype=dict, shape =(*:attr:`N_batch` *,))*)
                 Array of dictionaries containing the trial parameters produced by :func:`generate_trial_params` for each trial in :attr:`N_batch`.
-        
+
         """
 
         batch = 1
         while batch > 0:
-
             x_data = []
             y_data = []
             mask = []
@@ -196,7 +195,7 @@ class Task(ABC):
             for trial in range(self.N_batch):
                 # Generate each trial based on its params
                 p = self.generate_trial_params(batch, trial)
-                x,y,m = self.generate_trial(p)
+                x, y, m = self.generate_trial(p)
                 x_data.append(x)
                 y_data.append(y)
                 mask.append(m)
@@ -221,4 +220,3 @@ class Task(ABC):
 
         """
         return next(self.batch_generator())
-
