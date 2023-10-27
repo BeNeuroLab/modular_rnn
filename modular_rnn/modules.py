@@ -30,7 +30,7 @@ class RNNModule(nn.Module):
         self.nonlin = nonlin
         self.p_rec = p_rec
         self.nonlin_fn = nonlin
-        self.bias = bias
+        self.use_bias = bias
         self.train_recurrent_weights = train_recurrent_weights
 
         self.allow_self_connections = allow_self_connections
@@ -56,13 +56,21 @@ class RNNModule(nn.Module):
         self.glorot_gauss_init()
 
         # set strategy to initialize hidden states
-        assert hidden_state_init_mode in ("zero", "constant", "random", "learn")
+        assert hidden_state_init_mode in (
+            "zero",
+            "constant",
+            "random",
+            "learn",
+            "resting",
+        )
         self.hidden_state_init_mode = hidden_state_init_mode
 
         # for potentially initializing to the same nonzero state in every trial
         init_x = self.sample_random_hidden_state_vector()
         if self.hidden_state_init_mode == "learn":
             self.init_x = nn.Parameter(init_x, requires_grad=True)
+        elif self.hidden_state_init_mode == "resting":
+            self.init_x = self.bias
         else:
             self.register_buffer("init_x", init_x)
 
@@ -84,15 +92,13 @@ class RNNModule(nn.Module):
         """
         if self.hidden_state_init_mode == "zero":
             init_state = torch.zeros(1, self.batch_size, self.n_neurons).to(self.device)
-        elif self.hidden_state_init_mode == "constant":
+        elif self.hidden_state_init_mode in ("constant", "learn", "resting"):
             init_state = torch.tile(self.init_x, (1, self.batch_size, 1))
         elif self.hidden_state_init_mode == "random":
             init_state = self.sample_random_hidden_state_batch()
-        elif self.hidden_state_init_mode == "learn":
-            init_state = torch.tile(self.init_x, (1, self.batch_size, 1))
         else:
             raise ValueError(
-                "hidden_state_init_mode has to be one of 'zero', 'constant', 'random', 'learn'"
+                "hidden_state_init_mode has to be one of 'zero', 'constant', 'random', 'learn', 'resting'"
             )
 
         self.hidden_states = [init_state]
@@ -165,7 +171,7 @@ class RNNModule(nn.Module):
             self.n = nn.Parameter(_n, requires_grad=self.train_recurrent_weights)
             self.m = nn.Parameter(_m, requires_grad=self.train_recurrent_weights)
 
-        if self.bias:
+        if self.use_bias:
             self.bias = nn.Parameter(
                 glorot_gauss_tensor((1, self.n_neurons)), requires_grad=True
             )
