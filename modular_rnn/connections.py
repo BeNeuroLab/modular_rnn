@@ -20,7 +20,7 @@ class ConnectionConfig:
     train_weights_direction: bool = True
     mask: Optional[torch.Tensor] = None  # for masking input lines such as go cue
     W: Optional[torch.Tensor] = None
-    train_bias: bool = True
+    train_bias: bool = False
 
     def __init__(
         self,
