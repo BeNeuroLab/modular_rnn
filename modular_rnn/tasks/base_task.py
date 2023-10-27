@@ -1,5 +1,6 @@
 # based on PsychRNN
 import numpy as np
+import torch
 
 from abc import ABC, abstractmethod
 
@@ -47,7 +48,7 @@ class Task(ABC):
         self.N_steps = int(np.ceil(self.T / self.dt))
 
     @abstractmethod
-    def generate_trial_params(self, batch_num: int, trial_num: int):
+    def generate_trial_params(self, batch_num: int, trial_num: int, test: bool):
         """
         Using a combination of randomness, presets, and task attributes, generate parameters for each trial.
 
@@ -57,6 +58,8 @@ class Task(ABC):
             The batch number for this trial.
         trial_num :int
             The trial number of the trial within the batch data:`batch`.
+        test: bool
+            True if the trial is for testing, False if the trial is for training.
 
         Returns
         -------
@@ -154,7 +157,7 @@ class Task(ABC):
         }
 
         for t in range(self.N_steps):
-            inputs_t, outputs_t, masks_t = self.trial_function(t * self.dt, params)
+            inputs_t, outputs_t, masks_t = self.trial_function(int(t * self.dt), params)
 
             for input_name in self.input_dims.keys():
                 trial_inputs[input_name][t, :] = inputs_t[input_name]
@@ -165,7 +168,7 @@ class Task(ABC):
 
         return trial_inputs, trial_outputs, trial_masks
 
-    def batch_generator(self):
+    def batch_generator(self, test: bool = False):
         """Generates a batch of trials.
 
         Returns:
@@ -194,7 +197,7 @@ class Task(ABC):
             # Loop over trials in batch
             for trial in range(self.N_batch):
                 # Generate each trial based on its params
-                p = self.generate_trial_params(batch, trial)
+                p = self.generate_trial_params(batch, trial, test)
                 x, y, m = self.generate_trial(p)
                 x_data.append(x)
                 y_data.append(y)
@@ -205,18 +208,49 @@ class Task(ABC):
 
             yield x_data, y_data, mask, params
 
-    def get_trial_batch(self):
-        """Get a batch of trials.
-
-        Wrapper for :code:`next(self.batch_generator())`.
-
-        Returns:
-            tuple:
-
-            * **stimulus** (*ndarray(dtype=float, shape =(*:attr:`N_batch`, :attr:`N_steps`, :attr:`N_in` *))*): Task stimuli for :attr:`N_batch` trials.
-            * **target_output** (*ndarray(dtype=float, shape =(*:attr:`N_batch`, :attr:`N_steps`, :attr:`N_out` *))*): Target output for the network on :attr:`N_batch` trials given the :data:`stimulus`.
-            * **output_mask** (*ndarray(dtype=bool, shape =(*:attr:`N_batch`, :attr:`N_steps`, :attr:`N_out` *))*): Output mask for :attr:`N_batch` trials. True when the network should aim to match the target output, False when the target output can be ignored.
-            * **trial_params** (*ndarray(dtype=dict, shape =(*:attr:`N_batch` *,))*): Array of dictionaries containing the trial parameters produced by :func:`generate_trial_params` for each trial in :attr:`N_batch`.
-
+    def get_batch_of_trials(self, device: torch.device, test: bool = False):
         """
-        return next(self.batch_generator())
+        Get a batch of trials from the task and convert it to a format the RNN can process.
+        """
+        # get a batch of trials from the task
+        batch_inputs, batch_outputs, batch_masks, trial_params = next(
+            self.batch_generator(test)
+        )
+
+        # get them to PyTorch's preferred shape and put them to the device the model is on
+
+        collected_inputs = {input_name: [] for input_name in self.input_dims.keys()}
+        collected_outputs = {output_name: [] for output_name in self.output_dims.keys()}
+        collected_masks = {output_name: [] for output_name in self.output_dims.keys()}
+
+        for trial_inputs in batch_inputs:
+            for input_name, input_value in trial_inputs.items():
+                collected_inputs[input_name].append(input_value)
+        for input_name, input_value in collected_inputs.items():
+            collected_inputs[input_name] = (
+                torch.tensor(np.array(input_value), dtype=torch.float)
+                .transpose(1, 0)
+                .to(device)
+            )
+
+        for trial_outputs in batch_outputs:
+            for output_name, output_value in trial_outputs.items():
+                collected_outputs[output_name].append(output_value)
+        for output_name, output_value in collected_outputs.items():
+            collected_outputs[output_name] = (
+                torch.tensor(np.array(output_value), dtype=torch.float)
+                .transpose(1, 0)
+                .to(device)
+            )
+
+        for trial_mask in batch_masks:
+            for output_name, mask_value in trial_mask.items():
+                collected_masks[output_name].append(mask_value)
+        for output_name, mask_value in collected_masks.items():
+            collected_masks[output_name] = (
+                torch.tensor(np.array(mask_value), dtype=torch.float)
+                .transpose(1, 0)
+                .to(device)
+            )
+
+        return collected_inputs, collected_outputs, collected_masks, trial_params

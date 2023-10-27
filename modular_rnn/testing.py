@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
+import torch
 
 import dataclasses
-
-from .training import get_batch_of_trials
 
 from .models import MultiRegionRNN
 from .tasks.base_task import Task
@@ -68,8 +67,13 @@ def run_test_batch(model: MultiRegionRNN, task: Task) -> BatchResult:
     -------
     BatchResult namedtuple
     """
-    trial_input, target_output, mask, trial_params = get_batch_of_trials(task, model)
-    model_outputs, rates = model(trial_input)  # run the model on input x
+    trial_input, target_output, mask, trial_params = task.get_batch_of_trials(
+        model.device,
+        test=True,
+    )
+
+    with torch.no_grad():
+        model_outputs, rates = model(trial_input)  # run the model on input x
 
     def _to_np(arr):
         try:

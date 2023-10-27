@@ -56,12 +56,15 @@ class RNNModule(nn.Module):
         self.glorot_gauss_init()
 
         # set strategy to initialize hidden states
-        assert hidden_state_init_mode in ("zero", "constant", "random")
+        assert hidden_state_init_mode in ("zero", "constant", "random", "learn")
         self.hidden_state_init_mode = hidden_state_init_mode
 
         # for potentially initializing to the same nonzero state in every trial
         init_x = self.sample_random_hidden_state_vector()
-        self.register_buffer("init_x", init_x)
+        if self.hidden_state_init_mode == "learn":
+            self.init_x = nn.Parameter(init_x, requires_grad=True)
+        else:
+            self.register_buffer("init_x", init_x)
 
     def sample_random_hidden_state_vector(self) -> torch.Tensor:
         """
@@ -85,9 +88,11 @@ class RNNModule(nn.Module):
             init_state = torch.tile(self.init_x, (1, self.batch_size, 1))
         elif self.hidden_state_init_mode == "random":
             init_state = self.sample_random_hidden_state_batch()
+        elif self.hidden_state_init_mode == "learn":
+            init_state = torch.tile(self.init_x, (1, self.batch_size, 1))
         else:
             raise ValueError(
-                "hidden_state_init_mode has to be one of 'zero', 'constant', 'random'"
+                "hidden_state_init_mode has to be one of 'zero', 'constant', 'random', 'learn'"
             )
 
         self.hidden_states = [init_state]
@@ -221,7 +226,8 @@ class ModelOutput(nn.Module):
         self.dummy_param = nn.Parameter(torch.empty(0))
 
     def reset(self, batch_size: int) -> None:
-        self.values = [torch.zeros(1, batch_size, self.dim).to(self.device)]
+        # self.values = [torch.zeros(1, batch_size, self.dim).to(self.device)]
+        self.values = []
 
     def as_tensor(self) -> torch.Tensor:
         return torch.stack(self.values, dim=1).squeeze(dim=0)

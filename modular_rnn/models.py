@@ -137,33 +137,57 @@ class MultiRegionRNN(nn.Module):
         for region in self.regions.values():
             region.init_hidden()
 
+        # initialize to empty lists
         for output in self.outputs.values():
             output.reset(self.batch_size)
 
+        # reset all outputs to zero
+        for output in self.outputs.values():
+            output.values_at_current_time = torch.zeros(
+                1, self.batch_size, output.dim
+            ).to(self.device)
+
+        # read out the output values at time=0
+        for conn in self.output_connections:
+            self.outputs[conn.target_name].values_at_current_time += conn(
+                self.regions[conn.source_name].rates[0]
+            )
+        for output in self.outputs.values():
+            output.values.append(output.values_at_current_time)
+
         for t in range(1, T):
             for region in self.regions.values():
+                # reset inputs at current time to zero
                 region.inputs_at_current_time = torch.zeros(
                     1, self.batch_size, region.target_dim
                 ).to(self.device)
+
+            # reset all outputs to zero
             for output in self.outputs.values():
                 output.values_at_current_time = torch.zeros(
                     1, self.batch_size, output.dim
                 ).to(self.device)
 
+            # add inputs from other regions
             for conn in self.region_connections:
                 self.regions[conn.target_name].inputs_at_current_time += conn(
                     self.regions[conn.source_name].rates[t - 1]
                 )
+
+            # add inputs from external inputs
             for conn in self.input_connections:
                 # TODO do I want external input at t or t-1?
                 self.regions[conn.target_name].inputs_at_current_time += conn(
                     inputs[conn.source_name][t]
                 )
+
+            # add inputs from feedback
             for conn in self.feedback_connections:
                 self.regions[conn.target_name].inputs_at_current_time += conn(
                     self.outputs[conn.source_name].values[t - 1]
                 )
 
+            # use the inputs to perform a step
             for region in self.regions.values():
                 region.f_step()
 

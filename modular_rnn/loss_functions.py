@@ -42,6 +42,10 @@ class RateLoss(nn.Module):
     pass_rnn = True
 
     def __init__(self, region_regularizers: dict[str, float]):
+        """
+        region_regularizers: dict[str, float]
+            Dictionary of region names and their regularization coefficients
+        """
         super().__init__()
         self.region_regularizers = region_regularizers
 
@@ -54,12 +58,10 @@ class RateLoss(nn.Module):
     ):
         error = 0.0
         for region_name in self.region_regularizers.keys():
-            error += (
-                self.region_regularizers[region_name]
-                * torch.linalg.vector_norm(
-                    rnn.regions[region_name].rates_tensor, dim=2
-                ).mean()
-            )
+            mean_pop_rate_norm = torch.linalg.vector_norm(
+                rnn.regions[region_name].rates_tensor, dim=2
+            ).mean()
+            error += self.region_regularizers[region_name] * mean_pop_rate_norm
 
         return error
 
