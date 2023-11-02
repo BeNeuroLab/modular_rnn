@@ -37,7 +37,7 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
         self.cue_kappas = cue_kappas
         self.input_length = input_length
 
-    def generate_trial_params(self, batch, trial):
+    def generate_trial_params(self, batch, trial, test: bool = False):
         params = dict()
 
         target_dir = (np.pi / 2) + np.random.vonmises(mu=0, kappa=self.target_kappa)
@@ -108,7 +108,7 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
             shifted_time = time - params["idx_go_cue"]
 
             # position is the extent projected to the x and y axes
-            extent_at_t = extent_curve(shifted_time)
+            extent_at_t = extent_curve[shifted_time]
             outputs_t["hand"] = target_cossin * extent_at_t
 
         # we always care about correct position
@@ -150,7 +150,7 @@ class CenterOutTaskWithReachProfiles(Task):
         self.targets = np.linspace(0, 2 * np.pi, num=n_targets, endpoint=False)
         self.input_length = input_length
 
-    def generate_trial_params(self, batch, trial):
+    def generate_trial_params(self, batch, trial, test: bool = False):
         params = dict()
 
         target_id = np.random.randint(self.n_targets)
@@ -206,7 +206,7 @@ class CenterOutTaskWithReachProfiles(Task):
             shifted_time = time - params["idx_go_cue"]
 
             # position is the extent projected to the x and y axes
-            extent_at_t = extent_curve(shifted_time)
+            extent_at_t = extent_curve[shifted_time]
             outputs_t["hand"] = target_cossin * extent_at_t
 
         # we always care about correct position

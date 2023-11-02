@@ -108,7 +108,7 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
             shifted_time = time - params["idx_go_cue"]
 
             # position is the extent projected to the x and y axes
-            extent_at_t = extent_curve(shifted_time)
+            extent_at_t = extent_curve[shifted_time]
             outputs_t["hand"] = target_cossin * extent_at_t
 
         # we always care about correct position

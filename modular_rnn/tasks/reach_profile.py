@@ -1,3 +1,4 @@
+import numpy as np
 from jax import jit
 from tensorflow_probability.substrates import jax as tfp
 
@@ -19,10 +20,15 @@ speed_gaussian = tfp.distributions.Normal(loc=speed_curve_mean, scale=speed_curv
 
 
 @jit
-def speed_curve(x):
+def _speed_curve_fn(x):
     return speed_gaussian.prob(x - median_reaction_time)
 
 
 @jit
-def extent_curve(x):
+def _extent_curve_fn(x):
     return speed_gaussian.cdf(x - median_reaction_time)
+
+
+MAX_TRIAL_LENGTH = 2000
+extent_curve = np.array(_extent_curve_fn(np.arange(MAX_TRIAL_LENGTH)))
+speed_curve = np.array(_speed_curve_fn(np.arange(MAX_TRIAL_LENGTH)))
