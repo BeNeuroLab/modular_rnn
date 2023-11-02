@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.1
 #   kernelspec:
 #     display_name: Python 3.9 (uncertainty)
 #     language: python
@@ -60,6 +60,9 @@ noise = 0.05
 # activation function of the neurons
 nonlin_fn = F.relu
 
+# how long the targets are shown
+input_length = 40
+
 # %%
 # length of each trial
 L = 1200
@@ -76,12 +79,12 @@ loss_fn = MSEOnlyLoss(['hand'])
 # %%
 from modular_rnn.tasks import CenterOutTaskWithReachProfiles
 
-task = CenterOutTaskWithReachProfiles(dt, tau, L, batch_size, n_targets = 8)
+task = CenterOutTaskWithReachProfiles(dt, tau, L, batch_size, n_targets = 8, input_length = input_length)
 
 # %% [markdown]
 # ## Create RNN
 
-# %% tags=[]
+# %%
 # dictionary defining the modules in the RNN
 # here we'll have a single region called motor_cortex
 regions_config_dict = {
@@ -89,14 +92,14 @@ regions_config_dict = {
         'n_neurons' : 50,
         'alpha' : alpha,
         'p_rec': 1.,
-        'rec_rank' : 1,
+        #'rec_rank' : 1,
         'dynamics_noise' : noise,
     },
     'M1' : {
         'n_neurons' : 50,
         'alpha' : alpha,
         'p_rec': 1.,
-        'rec_rank' : 1,
+        #'rec_rank' : 1,
         'dynamics_noise' : noise,
     }
 }
@@ -109,31 +112,37 @@ input_dims = task.input_dims
 
 # %%
 rnn = MultiRegionRNN(
-         input_dims,
-         output_dims,
-         alpha,
-         nonlin_fn,
-         regions_config_dict, 
-         connection_configs = [
-             ConnectionConfig('PMd', 'M1')
-         ],
-         input_configs = [
-             ConnectionConfig('target', 'PMd'),
-             ConnectionConfig('go_cue', 'PMd'),
-         ],
-         output_configs = [
-             ConnectionConfig('M1', 'hand'),
-         ],
-         feedback_configs = []
+     input_dims,
+     output_dims,
+     alpha,
+     nonlin_fn,
+     regions_config_dict, 
+     connection_configs = [
+         ConnectionConfig('PMd', 'M1')
+     ],
+     input_configs = [
+         ConnectionConfig('target', 'PMd'),
+         ConnectionConfig('go_cue', 'PMd'),
+     ],
+     output_configs = [
+         ConnectionConfig('M1', 'hand'),
+     ],
+     feedback_configs = []
 )
 
 # %% [markdown]
 # # Train
 
-# %% tags=[]
+# %%
 from modular_rnn.training import train
 
+#if torch.cuda.is_available():
+#    rnn.cuda()
+
 losses = train(rnn, task, 300, loss_fn)
+
+#rnn.cpu();
+
 plt.plot(losses[10:]);
 
 # %% [markdown]
@@ -226,11 +235,22 @@ from pysubspaces import get_classif_cv_scores_through_time
 from sklearn.linear_model import RidgeClassifier
 
 # %%
-prep_td = restrict_to_interval(test_df, 'idx_target_on', rel_start = 0, rel_end = 70)
+prep_td = restrict_to_interval(test_df, 'idx_target_on', rel_start = 0, rel_end = 100)
 
 cv_scores = get_classif_cv_scores_through_time(prep_td, RidgeClassifier, 'PMd_proj', 'target_id')
 plt.plot(cv_scores.mean(axis = 1))
+cv_scores = get_classif_cv_scores_through_time(prep_td, RidgeClassifier, 'M1_proj', 'target_id')
+plt.plot(cv_scores.mean(axis = 1))
 plt.xlabel('timestep')
 plt.ylabel('accuracy')
+
+# %% [markdown]
+# Just checking that the (cos, sin) input's length is okay
+
+# %%
+for i in range(10):
+    plt.plot(prep_td.target_input.values[i][:, 0])
+    plt.axvline(prep_td.idx_target_on.values[i], color = "black")
+    plt.axvline(prep_td.idx_go_cue.values[i], color = "red")
 
 # %%

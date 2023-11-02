@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.1
 #   kernelspec:
 #     display_name: Python 3.9 (uncertainty)
 #     language: python
@@ -84,7 +84,7 @@ task = CossinUncertaintyTaskWithReachProfiles(dt, tau, L, batch_size)
 # %% [markdown]
 # Create RNN
 
-# %% tags=[]
+# %%
 # dictionary defining the modules in the RNN
 # here we'll have a single region called motor_cortex
 regions_config_dict = {
@@ -104,26 +104,26 @@ input_dims = task.input_dims
 
 # %%
 rnn = MultiRegionRNN(
-         input_dims,
-         output_dims,
-         alpha,
-         nonlin_fn,
-         regions_config_dict, 
-         connection_configs = [],
-         input_configs = [
-            ConnectionConfig('cue_slices_cossin', 'motor_cortex'),
-            ConnectionConfig('go_cue', 'motor_cortex'),
-         ],
-         output_configs = [
-             ConnectionConfig('motor_cortex', 'hand'),
-         ],
-         feedback_configs= []
+     input_dims,
+     output_dims,
+     alpha,
+     nonlin_fn,
+     regions_config_dict, 
+     connection_configs = [],
+     input_configs = [
+        ConnectionConfig('cue_slices_cossin', 'motor_cortex'),
+        ConnectionConfig('go_cue', 'motor_cortex'),
+     ],
+     output_configs = [
+         ConnectionConfig('motor_cortex', 'hand'),
+     ],
+     feedback_configs = []
 )
 
 # %% [markdown]
 # # Train
 
-# %% tags=[]
+# %%
 from modular_rnn.training import train
 
 losses = train(rnn, task, 500, loss_fn)
