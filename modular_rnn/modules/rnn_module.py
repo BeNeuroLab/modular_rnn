@@ -1,10 +1,11 @@
 from typing import Union
 
+from math import sqrt
 import torch
 import torch.nn as nn
 
-from .utils import glorot_gauss_tensor
-from .low_rank_utils import get_nm_from_W
+from ..utils import glorot_gauss_tensor
+from ..low_rank_utils import get_nm_from_W
 
 
 class RNNModule(nn.Module):
@@ -20,12 +21,13 @@ class RNNModule(nn.Module):
         dynamics_noise: Union[float, None] = None,
         bias: bool = True,
         hidden_state_init_mode: str = "zero",
-        allow_self_connections: bool = True,
+        allow_self_connections: bool = False,
     ):
         super().__init__()
 
         self.name = name
         self.n_neurons = n_neurons
+        # TODO instead of passing alpha, pass dt and tau and calculate alpha in the constructor
         self.alpha = alpha
         self.nonlin = nonlin
         self.p_rec = p_rec
@@ -42,7 +44,9 @@ class RNNModule(nn.Module):
             self.noise_amp = 0
         else:
             self.noisy = True
-            self.noise_amp = dynamics_noise
+            # scale the noise amplitude such that without other inputs,
+            # the std of the hidden states will be equal to noise_amp
+            self.noise_amp = dynamics_noise * sqrt(2 * alpha)
 
         if rec_rank is not None:
             assert isinstance(rec_rank, int)
@@ -115,11 +119,12 @@ class RNNModule(nn.Module):
         )
 
         if self.noisy:
-            x += (
-                self.alpha
-                * self.noise_amp
-                * torch.randn(1, self.batch_size, self.n_neurons).to(self.device)
-            )
+            # self.noise_amp is rescaled such that we don't need to multiply by alpha here
+            x += torch.normal(
+                0,
+                self.noise_amp,
+                size=(1, self.batch_size, self.n_neurons),
+            ).to(self.device)
 
         r = self.nonlin_fn(x)
 
@@ -218,147 +223,3 @@ class RNNModule(nn.Module):
 
     def __repr__(self) -> str:
         return str(self.__dict__)
-
-
-class ModelOutput(nn.Module):
-    def __init__(self, name: str, dim: int):
-        super().__init__()
-
-        self.name = name
-        self.dim = dim
-        self.values = None
-
-        # needed for self.device
-        self.dummy_param = nn.Parameter(torch.empty(0))
-
-    def reset(self, batch_size: int) -> None:
-        # self.values = [torch.zeros(1, batch_size, self.dim).to(self.device)]
-        self.values = []
-
-    def as_tensor(self) -> torch.Tensor:
-        return torch.stack(self.values, dim=1).squeeze(dim=0)
-
-    # def __getitem__(self, item):
-    #    return self.as_tensor()[item]
-
-    # def __getattr__(self, name: str):
-    #    return getattr(self.as_tensor(), name)
-
-    @property
-    def device(self) -> torch.device:
-        return self.dummy_param.device
-
-
-class ODEModule(nn.Module):
-    def __init__(
-        self,
-        name: str,
-        n_dims: int,
-        n_inputs: int,
-        n_hidden: int,
-        # n_output_neurons: int,
-        alpha: float,
-        dynamics_noise: Union[float, None] = None,
-        use_constant_init_state: bool = False,
-    ):
-        super().__init__()
-
-        self.name = name
-        self.n_dims = n_dims
-        self.n_inputs = n_inputs
-        self.n_hidden = n_hidden
-        self.alpha = alpha
-        self.use_constant_init_state = use_constant_init_state
-
-        if dynamics_noise is None:
-            self.noisy = False
-            self.noise_amp = 0
-        else:
-            self.noisy = True
-            self.noise_amp = dynamics_noise
-
-        print(f"n_dims: {n_dims}")
-        print(f"n_inputs: {n_inputs}")
-        self.f = nn.Sequential(
-            nn.Linear(n_dims + n_inputs, n_hidden),
-            nn.ReLU(),
-            nn.Linear(n_hidden, n_dims),
-        )
-
-        # self.readout = nn.Sequential(
-        #    nn.Linear(n_dims, n_output_neurons),
-        #    nn.ReLU()
-        # )
-        # self.readout = nn.ReLU()
-        self.readout = nn.Identity()
-
-        # for potentially initializing to the same state in every trial
-        init_x = self.sample_random_hidden_state_vector()
-        self.register_buffer("init_x", init_x)
-
-    def sample_random_hidden_state_vector(self) -> torch.Tensor:
-        return 0.1 + 0.01 * torch.randn(self.n_dims).to(self.device)
-
-    def sample_random_hidden_state_batch(self) -> torch.Tensor:
-        return 0.1 + 0.01 * torch.randn(1, self.batch_size, self.n_dims).to(self.device)
-
-    def init_hidden(self) -> None:
-        if self.use_constant_init_state:
-            init_state = torch.tile(self.init_x, (1, self.batch_size, 1))
-        else:
-            init_state = self.sample_random_hidden_state_batch()
-
-        # NOTE might need self.device
-        self.hidden_states = [init_state]
-        self.rates = [self.readout(init_state)]
-
-    # @property
-    # def noisy(self):
-    #    return self.noise_amp > 0
-
-    def f_step(self) -> None:
-        x, r = self.hidden_states[-1], self.rates[-1]
-
-        x = x + self.alpha * self.f(
-            torch.concat((x, self.inputs_at_current_time), dim=2)
-        )
-
-        if self.noisy:
-            x += (
-                self.alpha
-                * self.noise_amp
-                * torch.randn(1, self.batch_size, self.n_dims).to(self.device)
-            )
-
-        r = self.readout(x)
-
-        self.hidden_states.append(x)
-        self.rates.append(r)
-
-    def get_hidden_states_tensor(self) -> torch.Tensor:
-        return torch.stack(self.hidden_states, dim=1).squeeze(dim=0)
-
-    @property
-    def rates_tensor(self) -> torch.Tensor:
-        return torch.stack(self.rates, dim=1).squeeze(dim=0)
-
-    @property
-    def device(self) -> torch.device:
-        return next(self.parameters()).device
-
-    @property
-    def dtype(self) -> torch.dtype:
-        return next(self.parameters()).dtype
-
-    def __repr__(self):
-        return str(self.__dict__)
-
-    @property
-    def target_dim(self) -> int:
-        # return self.n_dims
-        return self.n_inputs
-
-    @property
-    def source_dim(self) -> int:
-        # return self.n_output_neurons
-        return self.n_dims
