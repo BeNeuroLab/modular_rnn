@@ -38,7 +38,7 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
 
         return np.median(gaps)
 
-    def generate_trial_params(self, batch_num, trial_num):
+    def generate_trial_params(self, batch_num, trial_num, test: bool = False):
         params = dict()
 
         target_dir = self.target_dirs[self.trial_num]
