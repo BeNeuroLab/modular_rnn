@@ -237,4 +237,6 @@ class RNNModule(nn.Module):
         return (self.rec_mask * self.W_rec).norm()
 
     def __repr__(self) -> str:
-        return str(self.__dict__)
+        return f"""RNN module {self.name} with {self.n_neurons} neurons
+Recurrent connectivity rank: {self.rec_rank if self.rec_rank is not None else "full"}
+"""

@@ -159,4 +159,9 @@ class Connection(nn.Module):
     #    return getattr(self.config, name)
 
     def __repr__(self):
-        return str(self.__dict__)
+        return f"""Connection from {self.source_name} to {self.target_name}.
+Rank: {self.rank if self.rank is not None else "full"}
+
+Weights: {"trained" if self.train_weights_direction else "fixed"}
+Bias: {"trained" if self.train_bias else "fixed"}
+"""
