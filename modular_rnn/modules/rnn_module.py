@@ -207,7 +207,22 @@ class RNNModule(nn.Module):
         return self.n_neurons
 
     def reparametrize_with_svd(self) -> None:
-        self.n, self.m = get_nm_from_W(self.W_rec, self.rec_rank)
+        """
+        Recompute the low-rank parameters self.n and self.m from the full-rank parameter W_rec
+        based on the current value of self.rec_rank, and set self.full_rank to False
+
+        Example usage:
+            rnn.regions["M1"].rec_rank = rec_rank
+            rnn.regions["M1"].reparametrize_with_svd()
+        """
+        if hasattr(self, "n") and hasattr(self, "m"):
+            assert self.rec_rank != "full"
+            self.n.data, self.m.data = get_nm_from_W(self.W_rec, self.rec_rank)
+        else:
+            n, m = get_nm_from_W(self.W_rec, self.rec_rank)
+            self.n = nn.Parameter(n, requires_grad=self.train_recurrent_weights)
+            self.m = nn.Parameter(m, requires_grad=self.train_recurrent_weights)
+            self.full_rank = False
 
     @property
     def device(self) -> torch.device:
