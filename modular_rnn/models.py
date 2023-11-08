@@ -1,3 +1,5 @@
+from typing import Callable, Union, Optional
+
 import torch
 import torch.nn as nn
 
@@ -13,13 +15,13 @@ class MultiRegionRNN(nn.Module):
         input_dims: dict[str, int],
         output_dims: dict[str, int],
         alpha: float,
-        nonlin: callable,
-        regions_config: dict,
+        nonlin: Callable,
+        regions_config: dict[str, Union[dict, RNNModule, ODEModule]],
         connection_configs: list[ConnectionConfig],
         input_configs: list[ConnectionConfig],
         output_configs: list[ConnectionConfig],
         feedback_configs: list[ConnectionConfig],
-        dynamics_noise: float = None,
+        dynamics_noise: Optional[float] = None,
     ):
         super().__init__()
 

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 
 from math import sqrt
 import torch
@@ -14,7 +14,7 @@ class RNNModule(nn.Module):
         name: str,
         n_neurons: int,
         alpha: float,
-        nonlin: callable,
+        nonlin: Callable,
         p_rec: float = 1.0,
         rec_rank: Union[int, None] = None,
         train_recurrent_weights: bool = True,
