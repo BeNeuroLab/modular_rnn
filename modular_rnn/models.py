@@ -238,3 +238,26 @@ class MultiRegionRNN(nn.Module):
 
     def load_state_dict(self):
         raise NotImplementedError
+
+    def get_connection(self, source_name: str, target_name: str):
+        found_conns = []
+        for conn in (
+            self.region_connections
+            + self.input_connections
+            + self.output_connections
+            + self.feedback_connections
+        ):
+            if (conn.source_name == source_name) and (conn.target_name == target_name):
+                found_conns.append(conn)
+
+        if len(set(found_conns)) == 0:
+            raise ValueError(
+                f"Connection from {source_name} to {target_name} not found"
+            )
+
+        if len(set(found_conns)) > 1:
+            raise ValueError(
+                f"Multiple connections from {source_name} to {target_name} found"
+            )
+
+        return found_conns[0]

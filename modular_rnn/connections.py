@@ -16,7 +16,6 @@ class ConnectionConfig:
     rank: Optional[Union[int, str]] = None
     p_conn: float = 1.0
     norm: Optional[float] = None
-    # orthogonal: bool = False
     train_weights_direction: bool = True
     mask: Optional[torch.Tensor] = None  # for masking input lines such as go cue
     W: Optional[torch.Tensor] = None
@@ -103,7 +102,7 @@ class Connection(nn.Module):
 
     def connect(self, N_from: int, N_to: int) -> None:
         sparse_mask = torch.rand(N_to, N_from) < self.p_conn
-        self.register_buffer(f"sparse_mask", sparse_mask)
+        self.register_buffer("sparse_mask", sparse_mask)
 
         self.bias = nn.Parameter(torch.zeros(N_to), requires_grad=self.train_bias)
 
