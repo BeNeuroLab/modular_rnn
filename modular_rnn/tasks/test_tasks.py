@@ -7,7 +7,13 @@ from .reach_profile import extent_curve, speed_curve
 
 class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
     def __init__(
-        self, dt, tau, N_batch, stim_noise=0.05, cue_kappa=5, input_length=None
+        self,
+        dt,
+        tau,
+        N_batch,
+        stim_noise=0.05,
+        cue_kappa=5,
+        input_length=None,
     ):
         input_dims = {
             "cue_slices_cossin": 10,
@@ -53,9 +59,12 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
             target_dir + j * self.gap for j in range(-2, 3)
         ]
 
-        params["idx_trial_start"] = 50
-        params["idx_target_on"] = params["idx_trial_start"] + 100
-        params["idx_go_cue"] = params["idx_target_on"] + 300
+        # params["idx_trial_start"] = 50
+        # params["idx_target_on"] = params["idx_trial_start"] + 100
+        # params["idx_go_cue"] = params["idx_target_on"] + 300
+        params["idx_trial_start"] = 0
+        params["idx_target_on"] = params["idx_trial_start"]
+        params["idx_go_cue"] = params["idx_target_on"] + 350
         params["idx_trial_end"] = params["idx_go_cue"] + 450
 
         params["cue_input"] = np.array(
