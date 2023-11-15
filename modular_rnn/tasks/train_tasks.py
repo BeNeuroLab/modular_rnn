@@ -1,9 +1,11 @@
+from typing import Optional
+
 from .base_task import Task
 
 import numpy as np
 import scipy.stats
 
-from .reach_profile import extent_curve, speed_curve
+from .reach_profile import extent_curve
 
 
 def calc_cue_spread(arr: np.ndarray) -> float:
@@ -13,14 +15,15 @@ def calc_cue_spread(arr: np.ndarray) -> float:
 class CossinUncertaintyTaskWithReachProfiles(Task):
     def __init__(
         self,
-        dt,
-        tau,
-        T,
-        N_batch,
-        target_kappa=25,
-        stim_noise=0.05,
-        cue_kappas=(5, 50),
-        input_length=None,
+        dt: int,
+        tau: int,
+        T: int,
+        N_batch: int,
+        target_kappa: float = 25.0,
+        stim_noise: float = 0.05,
+        cue_kappas: tuple[float, ...] = (5.0, 50.0),
+        input_length: Optional[int] = None,
+        go_cue_length: Optional[int] = None,
     ):
         self.n_cue_slices = 5
 
@@ -36,6 +39,7 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
         self.target_kappa = target_kappa
         self.cue_kappas = cue_kappas
         self.input_length = input_length
+        self.go_cue_length = go_cue_length
 
     def generate_trial_params(self, batch, trial, test: bool = False):
         params = dict()
@@ -80,26 +84,19 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
         masks_t = {}
 
         # start with just noise
-        inputs_t["cue_slices_cossin"] = params["stim_noise"]["cue_slices_cossin"][
-            time, :
-        ]
+        inputs_t["cue_slices_cossin"] = params["stim_noise"]["cue_slices_cossin"][time, :]
+        inputs_t["go_cue"] = params["stim_noise"]["go_cue"][time, :]
+
+        trial_input_length = np.inf if self.input_length is None else self.input_length
+        trial_go_cue_length = np.inf if self.go_cue_length is None else self.go_cue_length
+
         # add the input after the target onset
-        if self.input_length is None:
-            if params["idx_target_on"] <= time:
-                inputs_t["cue_slices_cossin"] += params["cue_input"]
-        else:
-            if (
-                params["idx_target_on"]
-                <= time
-                < params["idx_target_on"] + self.input_length
-            ):
-                inputs_t["cue_slices_cossin"] += params["cue_input"]
+        if params["idx_target_on"] <= time < params["idx_target_on"] + trial_input_length:
+            inputs_t["cue_slices_cossin"] += params["cue_input"]
 
         # go signal should be on after the go cue
-        if time >= params["idx_go_cue"]:
-            inputs_t["go_cue"] = 1 + params["stim_noise"]["go_cue"][time, :]
-        else:
-            inputs_t["go_cue"] = 0 + params["stim_noise"]["go_cue"][time, :]
+        if params["idx_go_cue"] <= time < params["idx_go_cue"] + trial_go_cue_length:
+            inputs_t["go_cue"] += 1.0
 
         # in the beginning the output is nothing, then it's the mean position or velocity profile
         if time < params["idx_go_cue"]:
@@ -130,13 +127,14 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
 class CenterOutTaskWithReachProfiles(Task):
     def __init__(
         self,
-        dt,
-        tau,
+        dt: int,
+        tau: int,
         T: int,
         N_batch: int,
         n_targets: int = 8,
-        stim_noise=0.05,
-        input_length=None,
+        stim_noise: float = 0.05,
+        input_length: Optional[int] = None,
+        go_cue_length: Optional[int] = None,
     ):
         input_dims = {
             "target": 2,
@@ -149,6 +147,7 @@ class CenterOutTaskWithReachProfiles(Task):
         self.n_targets = n_targets
         self.targets = np.linspace(0, 2 * np.pi, num=n_targets, endpoint=False)
         self.input_length = input_length
+        self.go_cue_length = go_cue_length
 
     def generate_trial_params(self, batch, trial, test: bool = False):
         params = dict()
@@ -182,22 +181,17 @@ class CenterOutTaskWithReachProfiles(Task):
 
         # add the input after the target onset
         inputs_t["target"] = params["stim_noise"]["target"][time, :]
-        if self.input_length is None:
-            if params["idx_target_on"] <= time:
-                inputs_t["target"] += target_cossin
-        else:
-            if (
-                params["idx_target_on"]
-                <= time
-                < params["idx_target_on"] + self.input_length
-            ):
-                inputs_t["target"] += target_cossin
+        inputs_t["go_cue"] = params["stim_noise"]["go_cue"][time, :]
+
+        trial_input_length = np.inf if self.input_length is None else self.input_length
+        trial_go_cue_length = np.inf if self.go_cue_length is None else self.go_cue_length
+
+        if params["idx_target_on"] <= time < params["idx_target_on"] + trial_input_length:
+            inputs_t["target"] += target_cossin
 
         # go signal should be on after the go cue
-        if time >= params["idx_go_cue"]:
-            inputs_t["go_cue"] = 1 + params["stim_noise"]["go_cue"][time, :]
-        else:
-            inputs_t["go_cue"] = 0 + params["stim_noise"]["go_cue"][time, :]
+        if params["idx_go_cue"] <= time < params["idx_go_cue"] + trial_go_cue_length:
+            inputs_t["go_cue"] += 1.0
 
         # in the beginning the output is nothing, then it's the mean position or velocity profile
         if time < params["idx_go_cue"]:

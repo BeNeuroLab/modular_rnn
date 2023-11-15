@@ -1,3 +1,5 @@
+from typing import Optional
+
 from .base_task import Task
 
 import numpy as np
@@ -8,12 +10,13 @@ from .reach_profile import extent_curve, speed_curve
 class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
     def __init__(
         self,
-        dt,
-        tau,
-        N_batch,
-        stim_noise=0.05,
-        cue_kappa=5,
-        input_length=None,
+        dt: int,
+        tau: int,
+        N_batch: int,
+        stim_noise: float = 0.05,
+        cue_kappa: float = 5.0,
+        input_length: Optional[int] = None,
+        go_cue_length: Optional[int] = None,
     ):
         input_dims = {
             "cue_slices_cossin": 10,
@@ -32,6 +35,7 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
         self.trial_num = 0
         self.target_dirs = np.linspace(0, np.pi, self.N_batch)
         self.input_length = input_length
+        self.go_cue_length = go_cue_length
 
     @staticmethod
     def estimate_gap(cue_kappa):
@@ -55,9 +59,7 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
 
         params["cue_kappa"] = self.cue_kappa
         params["gap"] = self.gap
-        params["cue_slice_locations"] = [
-            target_dir + j * self.gap for j in range(-2, 3)
-        ]
+        params["cue_slice_locations"] = [target_dir + j * self.gap for j in range(-2, 3)]
 
         # params["idx_trial_start"] = 50
         # params["idx_target_on"] = params["idx_trial_start"] + 100
@@ -90,25 +92,18 @@ class EqualSpacedUncertaintyTaskWithReachProfiles(Task):
         masks_t = {}
 
         # add the input after the target onset
-        inputs_t["cue_slices_cossin"] = params["stim_noise"]["cue_slices_cossin"][
-            time, :
-        ]
-        if self.input_length is None:
-            if time >= params["idx_target_on"]:
-                inputs_t["cue_slices_cossin"] += params["cue_input"]
-        else:
-            if (
-                params["idx_target_on"]
-                <= time
-                < params["idx_target_on"] + self.input_length
-            ):
-                inputs_t["cue_slices_cossin"] += params["cue_input"]
+        inputs_t["cue_slices_cossin"] = params["stim_noise"]["cue_slices_cossin"][time, :]
+        inputs_t["go_cue"] = params["stim_noise"]["go_cue"][time, :]
+
+        trial_input_length = np.inf if self.input_length is None else self.input_length
+        trial_go_cue_length = np.inf if self.go_cue_length is None else self.go_cue_length
+
+        if params["idx_target_on"] <= time < params["idx_target_on"] + trial_input_length:
+            inputs_t["cue_slices_cossin"] += params["cue_input"]
 
         # go signal should be on after the go cue
-        if time >= params["idx_go_cue"]:
-            inputs_t["go_cue"] = 1 + params["stim_noise"]["go_cue"][time, :]
-        else:
-            inputs_t["go_cue"] = 0 + params["stim_noise"]["go_cue"][time, :]
+        if params["idx_go_cue"] <= time < params["idx_go_cue"] + trial_go_cue_length:
+            inputs_t["go_cue"] += 1.0
 
         # in the beginning the output is nothing, then it's the mean position or velocity profile
         if time < params["idx_go_cue"]:
