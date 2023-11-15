@@ -8,3 +8,6 @@ dependencies = [
 
 [pycodestyle]
 max-line-length = 92
+
+[tool.black]
+line-length = 92
