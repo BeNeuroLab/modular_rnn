@@ -32,7 +32,10 @@ class CossinUncertaintyTaskWithReachProfiles(Task):
             "go_cue": 1,
         }
 
-        output_dims = {"hand": 2, "uncertainty": 1}
+        output_dims = {
+            "hand": 2,
+            "uncertainty": 1,
+        }
 
         super().__init__(input_dims, output_dims, dt, tau, T, N_batch)
         self.stim_noise = stim_noise
