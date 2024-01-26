@@ -19,7 +19,7 @@ def train(
     optimizer: Optional[torch.optim.Optimizer] = None,
     test_loss_fn: Optional[nn.Module] = None,
     test_freq: Optional[int] = None,
-    clipgrad: float = 1.0,
+    clipgrad: Optional[float] = 1.0,
     pbar: bool = True,
 ):
     """
@@ -49,6 +49,7 @@ def train(
         frequency of evaluating the test error
     clipgrad : float, default 1.
         gradient clipping norm
+        set to None to disable gradient clipping
     pbar : bool, default True
         draw progress bar
 
@@ -58,9 +59,7 @@ def train(
         loss values through iterations
     """
     if optimizer is None:
-        optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, rnn.parameters())
-        )
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, rnn.parameters()))
 
     try:
         progress_bar = tqdm(range(1, training_iters + 1), display=pbar)
@@ -91,7 +90,8 @@ def train(
 
         train_loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(rnn.parameters(), clipgrad)
+        if clipgrad is not None:
+            torch.nn.utils.clip_grad_norm_(rnn.parameters(), clipgrad)
 
         optimizer.step()
 
