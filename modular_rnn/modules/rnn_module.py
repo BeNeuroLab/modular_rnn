@@ -22,6 +22,7 @@ class RNNModule(nn.Module):
         bias: bool = True,
         hidden_state_init_mode: str = "zero",
         allow_self_connections: bool = False,
+        train_alpha: bool = False,
     ):
         super().__init__()
 
@@ -34,10 +35,16 @@ class RNNModule(nn.Module):
         self.nonlin_fn = nonlin
         self.use_bias = bias
         self.train_recurrent_weights = train_recurrent_weights
+        self.train_alpha = train_alpha
 
         self.allow_self_connections = allow_self_connections
         if not allow_self_connections:
             self.register_buffer("diag_mask", 1 - torch.eye(n_neurons))
+
+        if train_alpha:
+            self.alpha = nn.Parameter(
+                alpha * torch.ones(self.n_neurons), requires_grad=True
+            )
 
         if dynamics_noise is None:
             self.noisy = False
@@ -46,7 +53,7 @@ class RNNModule(nn.Module):
             self.noisy = True
             # scale the noise amplitude such that without other inputs,
             # the std of the hidden states will be equal to noise_amp
-            self.noise_amp = dynamics_noise * sqrt(2 * alpha)
+            self.noise_amp = dynamics_noise * sqrt(2 * self.alpha)
 
         if rec_rank is not None:
             assert isinstance(rec_rank, int)
@@ -120,10 +127,15 @@ class RNNModule(nn.Module):
 
         if self.noisy:
             # self.noise_amp is rescaled such that we don't need to multiply by alpha here
+            # x += torch.normal(
+            #    0,
+            #    self.noise_amp,
+            #    size=(1, self.batch_size, self.n_neurons),
+            # ).to(self.device)
+
             x += torch.normal(
                 0,
-                self.noise_amp,
-                size=(1, self.batch_size, self.n_neurons),
+                self.noise_amp.expand(self.batch_size, self.n_neurons).unsqueeze(0),
             ).to(self.device)
 
         r = self.nonlin_fn(x)
@@ -181,9 +193,7 @@ class RNNModule(nn.Module):
                 glorot_gauss_tensor((1, self.n_neurons)), requires_grad=True
             )
         else:
-            self.bias = nn.Parameter(
-                torch.zeros((1, self.n_neurons)), requires_grad=False
-            )
+            self.bias = nn.Parameter(torch.zeros((1, self.n_neurons)), requires_grad=False)
 
     @property
     def W_rec(self):
