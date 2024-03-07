@@ -86,9 +86,7 @@ class TolerantLoss(nn.Module):
         dir_mask = masks[self.direction_output_name]
 
         model_angle = torch.atan2(model_dir_output[:, :, 1], model_dir_output[:, :, 0])
-        target_angle = torch.atan2(
-            target_dir_output[:, :, 1], target_dir_output[:, :, 0]
-        )
+        target_angle = torch.atan2(target_dir_output[:, :, 1], target_dir_output[:, :, 0])
 
         angle_incorrect = torch.abs(model_angle - target_angle) > self.tolerance_in_rad
 

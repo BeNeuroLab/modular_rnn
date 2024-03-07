@@ -74,9 +74,7 @@ class ODEModule(nn.Module):
     def f_step(self) -> None:
         x, r = self.hidden_states[-1], self.rates[-1]
 
-        x = x + self.alpha * self.f(
-            torch.concat((x, self.inputs_at_current_time), dim=2)
-        )
+        x = x + self.alpha * self.f(torch.concat((x, self.inputs_at_current_time), dim=2))
 
         if self.noisy:
             x += torch.normal(

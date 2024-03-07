@@ -145,9 +145,9 @@ class MultiRegionRNN(nn.Module):
 
         # reset all outputs to zero
         for output in self.outputs.values():
-            output.values_at_current_time = torch.zeros(
-                1, self.batch_size, output.dim
-            ).to(self.device)
+            output.values_at_current_time = torch.zeros(1, self.batch_size, output.dim).to(
+                self.device
+            )
 
         # read out the output values at time=0
         for conn in self.output_connections:
@@ -251,9 +251,7 @@ class MultiRegionRNN(nn.Module):
                 found_conns.append(conn)
 
         if len(set(found_conns)) == 0:
-            raise ValueError(
-                f"Connection from {source_name} to {target_name} not found"
-            )
+            raise ValueError(f"Connection from {source_name} to {target_name} not found")
 
         if len(set(found_conns)) > 1:
             raise ValueError(

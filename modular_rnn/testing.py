@@ -116,9 +116,7 @@ def run_test_batches(
     if endpoint_location_fieldname is not None:
         ep_col_name = endpoint_location_fieldname + "_model_output"
         df["endpoint_location"] = [
-            np.arctan2(
-                *getattr(trial, ep_col_name)[trial.idx_trial_end - end_offset][::-1]
-            )
+            np.arctan2(*getattr(trial, ep_col_name)[trial.idx_trial_end - end_offset][::-1])
             for (_, trial) in df.iterrows()
         ]
 
