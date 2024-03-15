@@ -9,7 +9,6 @@ class ODEModule(nn.Module):
         self,
         name: str,
         n_dims: int,
-        n_inputs: int,
         n_hidden: int,
         # n_output_neurons: int,
         alpha: float,
@@ -20,7 +19,6 @@ class ODEModule(nn.Module):
 
         self.name = name
         self.n_dims = n_dims
-        self.n_inputs = n_inputs
         self.n_hidden = n_hidden
         self.alpha = alpha
         self.use_constant_init_state = use_constant_init_state
@@ -32,13 +30,12 @@ class ODEModule(nn.Module):
             self.noisy = True
             self.noise_amp = dynamics_noise
 
-        print(f"n_dims: {n_dims}")
-        print(f"n_inputs: {n_inputs}")
-        self.f = nn.Sequential(
-            nn.Linear(n_dims + n_inputs, n_hidden),
-            nn.ReLU(),
-            nn.Linear(n_hidden, n_dims),
-        )
+        # print(f"n_dims: {n_dims}")
+        # self.f = nn.Sequential(
+        #    nn.Linear(n_dims + n_inputs, n_hidden),
+        #    nn.ReLU(),
+        #    nn.Linear(n_hidden, n_dims),
+        # )
 
         # self.readout = nn.Sequential(
         #    nn.Linear(n_dims, n_output_neurons),
@@ -47,9 +44,18 @@ class ODEModule(nn.Module):
         # self.readout = nn.ReLU()
         self.readout = nn.Identity()
 
+        self.placeholder_param = nn.Parameter(torch.zeros(1), requires_grad=False)
+
         # for potentially initializing to the same state in every trial
         init_x = self.sample_random_hidden_state_vector()
         self.register_buffer("init_x", init_x)
+
+    def make_f(self, n_inputs: int) -> None:
+        self.f = nn.Sequential(
+            nn.Linear(self.n_dims + n_inputs, self.n_hidden),
+            nn.ReLU(),
+            nn.Linear(self.n_hidden, self.n_dims),
+        )
 
     def sample_random_hidden_state_vector(self) -> torch.Tensor:
         return 0.1 + 0.01 * torch.randn(self.n_dims).to(self.device)
@@ -74,7 +80,11 @@ class ODEModule(nn.Module):
     def f_step(self) -> None:
         x, r = self.hidden_states[-1], self.rates[-1]
 
-        x = x + self.alpha * self.f(torch.concat((x, self.inputs_at_current_time), dim=2))
+        x = x + self.alpha * self.f(
+            torch.concat(
+                (x, *(arr.unsqueeze(0) for arr in self.inputs_at_current_time)), dim=2
+            )
+        )
 
         if self.noisy:
             x += torch.normal(
@@ -109,7 +119,7 @@ class ODEModule(nn.Module):
     @property
     def target_dim(self) -> int:
         # return self.n_dims
-        return self.n_inputs
+        return None
 
     @property
     def source_dim(self) -> int:

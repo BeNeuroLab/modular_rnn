@@ -83,8 +83,8 @@ class MultiRegionRNN(nn.Module):
         self.region_connections.append(
             Connection(
                 conn_config,
-                self.regions[conn_config.source_name].source_dim,
-                self.regions[conn_config.target_name].target_dim,
+                N_from=self.regions[conn_config.source_name].source_dim,
+                N_to=self.regions[conn_config.target_name].target_dim,
             )
         )
 
@@ -99,8 +99,8 @@ class MultiRegionRNN(nn.Module):
         self.input_connections.append(
             Connection(
                 conn_config,
-                self.input_dims[conn_config.source_name],
-                self.regions[conn_config.target_name].target_dim,
+                N_from=self.input_dims[conn_config.source_name],
+                N_to=self.regions[conn_config.target_name].target_dim,
             )
         )
 
@@ -111,8 +111,8 @@ class MultiRegionRNN(nn.Module):
         self.output_connections.append(
             Connection(
                 conn_config,
-                self.regions[conn_config.source_name].source_dim,
-                self.outputs[conn_config.target_name].dim,
+                N_from=self.regions[conn_config.source_name].source_dim,
+                N_to=self.outputs[conn_config.target_name].dim,
             )
         )
 
@@ -122,8 +122,8 @@ class MultiRegionRNN(nn.Module):
         self.feedback_connections.append(
             Connection(
                 conn_config,
-                self.outputs[conn_config.source_name].dim,
-                self.regions[conn_config.target_name].target_dim,
+                N_from=self.outputs[conn_config.source_name].dim,
+                N_to=self.regions[conn_config.target_name].target_dim,
             )
         )
 
@@ -160,9 +160,10 @@ class MultiRegionRNN(nn.Module):
         for t in range(1, T):
             for region in self.regions.values():
                 # reset inputs at current time to zero
-                region.inputs_at_current_time = torch.zeros(
-                    1, self.batch_size, region.target_dim
-                ).to(self.device)
+                # region.inputs_at_current_time = torch.zeros(
+                #    1, self.batch_size, region.target_dim
+                # ).to(self.device)
+                region.inputs_at_current_time = []
 
             # reset all outputs to zero
             for output in self.outputs.values():
@@ -172,21 +173,21 @@ class MultiRegionRNN(nn.Module):
 
             # add inputs from other regions
             for conn in self.region_connections:
-                self.regions[conn.target_name].inputs_at_current_time += conn(
-                    self.regions[conn.source_name].rates[t - 1]
+                self.regions[conn.target_name].inputs_at_current_time.append(
+                    conn(self.regions[conn.source_name].rates[t - 1])
                 )
 
             # add inputs from external inputs
             for conn in self.input_connections:
                 # TODO do I want external input at t or t-1?
-                self.regions[conn.target_name].inputs_at_current_time += conn(
-                    inputs[conn.source_name][t]
+                self.regions[conn.target_name].inputs_at_current_time.append(
+                    conn(inputs[conn.source_name][t - 1])
                 )
 
             # add inputs from feedback
             for conn in self.feedback_connections:
-                self.regions[conn.target_name].inputs_at_current_time += conn(
-                    self.outputs[conn.source_name].values[t - 1]
+                self.regions[conn.target_name].inputs_at_current_time.append(
+                    conn(self.outputs[conn.source_name].values[t - 1])
                 )
 
             # use the inputs to perform a step

@@ -115,16 +115,21 @@ class RNNModule(nn.Module):
     def f_step(self) -> None:
         x, r = self.hidden_states[-1], self.rates[-1]
 
+        inputs_at_current_time = torch.zeros(
+            (1, self.batch_size, self.n_neurons),
+            device=self.device,
+        )
+        for arr in self.inputs_at_current_time:
+            inputs_at_current_time += arr
+        inputs_at_current_time /= len(self.inputs_at_current_time)
+
         x = x + self.alpha * (
-            -x
-            + r @ (self.rec_mask * self.W_rec).T
-            + self.inputs_at_current_time
-            + self.bias
+            -x + r @ (self.rec_mask * self.W_rec).T + inputs_at_current_time + self.bias
         )
 
         if self.noisy:
-            # self.noise_amp is rescaled such that we don't need to multiply by alpha here
             # x += torch.normal(
+            # self.noise_amp is rescaled such that we don't need to multiply by alpha here
             #    0,
             #    self.noise_amp,
             #    size=(1, self.batch_size, self.n_neurons),
