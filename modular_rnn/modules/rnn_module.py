@@ -1,6 +1,5 @@
 from typing import Union, Callable
 
-from math import sqrt
 import torch
 import torch.nn as nn
 
@@ -29,7 +28,6 @@ class RNNModule(nn.Module):
         self.name = name
         self.n_neurons = n_neurons
         # TODO instead of passing alpha, pass dt and tau and calculate alpha in the constructor
-        self.alpha = alpha
         self.nonlin = nonlin
         self.p_rec = p_rec
         self.nonlin_fn = nonlin
@@ -41,10 +39,9 @@ class RNNModule(nn.Module):
         if not allow_self_connections:
             self.register_buffer("diag_mask", 1 - torch.eye(n_neurons))
 
-        if train_alpha:
-            self.alpha = nn.Parameter(
-                alpha * torch.ones(self.n_neurons), requires_grad=True
-            )
+        self.alpha = nn.Parameter(
+            alpha * torch.ones(self.n_neurons), requires_grad=train_alpha
+        )
 
         if dynamics_noise is None:
             self.noisy = False
@@ -53,7 +50,7 @@ class RNNModule(nn.Module):
             self.noisy = True
             # scale the noise amplitude such that without other inputs,
             # the std of the hidden states will be equal to noise_amp
-            self.noise_amp = dynamics_noise * sqrt(2 * self.alpha)
+            self.noise_amp = dynamics_noise * torch.sqrt(2 * self.alpha)
 
         if rec_rank is not None:
             assert isinstance(rec_rank, int)
@@ -134,7 +131,7 @@ class RNNModule(nn.Module):
             # ).to(self.device)
 
             x += torch.normal(
-                0,
+                0.0,
                 self.noise_amp.expand(self.batch_size, self.n_neurons).unsqueeze(0),
             ).to(self.device)
 
