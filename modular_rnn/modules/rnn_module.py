@@ -1,10 +1,10 @@
-from typing import Union, Callable
+from typing import Callable, Union
 
 import torch
 import torch.nn as nn
 
-from ..utils import glorot_gauss_tensor
 from ..low_rank_utils import get_nm_from_W
+from ..utils import glorot_gauss_tensor
 
 
 class RNNModule(nn.Module):
@@ -121,7 +121,6 @@ class RNNModule(nn.Module):
         )
         for arr in self.inputs_at_current_time:
             inputs_at_current_time += arr
-        inputs_at_current_time /= len(self.inputs_at_current_time)
 
         x = x + self.alpha * (
             -x + r @ (self.rec_mask * self.W_rec).T + inputs_at_current_time + self.bias
