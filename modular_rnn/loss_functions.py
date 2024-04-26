@@ -1,11 +1,11 @@
 from typing import Union
 
 import numpy as np
-import torch.nn as nn
 import torch
+import torch.nn as nn
 
-from .modules import ModelOutput
 from .models import MultiRegionRNN
+from .modules import ModelOutput
 
 mse = nn.MSELoss()
 
@@ -134,3 +134,36 @@ class PoissonLoss(nn.Module):
             )
 
         return error
+
+
+class CombinedLoss(nn.Module):
+    pass_rnn = True
+
+    def __init__(self, loss_functions: dict[str, nn.Module], weights: dict[str, float]):
+        super().__init__()
+
+        assert loss_functions.keys() == weights.keys()
+
+        self.loss_functions = loss_functions
+        self.weights = weights
+        self.loss_logs = {loss_name: [] for loss_name in loss_functions.keys()}
+
+    def forward(
+        self,
+        rnn: MultiRegionRNN,
+        model_outputs: dict[str, ModelOutput],
+        target_outputs: dict[str, Union[np.ndarray, torch.Tensor]],
+        masks: dict[str, Union[np.ndarray, torch.Tensor]],
+    ):
+        loss_sum = 0.0
+        for loss_name, loss_fn in self.loss_functions.items():
+            if loss_fn.pass_rnn:
+                loss_val = loss_fn(rnn, model_outputs, target_outputs, masks)
+            else:
+                loss_val = loss_fn(model_outputs, target_outputs, masks)
+
+            loss_sum += self.weights[loss_name] * loss_val
+
+            self.loss_logs[loss_name].append(loss_val.item())
+
+        return loss_sum
