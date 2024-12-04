@@ -1,14 +1,12 @@
 from typing import Optional
 
 import numpy as np
-
 import torch
 import torch.nn as nn
+from tqdm.auto import tqdm
 
 from .models import MultiRegionRNN
 from .tasks.base_task import Task
-
-from tqdm.auto import tqdm
 
 
 def train(
@@ -62,9 +60,9 @@ def train(
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, rnn.parameters()))
 
     try:
-        progress_bar = tqdm(range(1, training_iters + 1), display=pbar)
+        progress_bar = tqdm(range(1, training_iters + 1), disable=not pbar)
     except:
-        progress_bar = tqdm(range(1, training_iters + 1), display=pbar)
+        progress_bar = tqdm(range(1, training_iters + 1), disable=not pbar)
 
     if (test_loss_fn is not None) and (test_freq is None):
         test_freq = 1

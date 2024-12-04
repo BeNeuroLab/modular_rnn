@@ -55,10 +55,8 @@ class RNNModule(nn.Module):
         if rec_rank is not None:
             assert isinstance(rec_rank, int)
             self.rec_rank = rec_rank
-            self.full_rank = False
         else:
             self.rec_rank = "full"
-            self.full_rank = True
 
         # initialize weights
         self.glorot_gauss_init()
@@ -116,8 +114,7 @@ class RNNModule(nn.Module):
         x, r = self.hidden_states[-1], self.rates[-1]
 
         inputs_at_current_time = torch.zeros(
-            (1, self.batch_size, self.n_neurons),
-            device=self.device,
+            (1, self.batch_size, self.n_neurons), device=self.device, dtype=self.dtype
         )
         for arr in self.inputs_at_current_time:
             inputs_at_current_time += arr
@@ -217,6 +214,14 @@ class RNNModule(nn.Module):
     def source_dim(self) -> int:
         return self.n_neurons
 
+    @property
+    def full_rank(self):
+        return self.rec_rank == "full"
+
+    def to_low_rank(self, rank: int) -> None:
+        self.rec_rank = rank
+        self.reparametrize_with_svd()
+
     def reparametrize_with_svd(self) -> None:
         """
         Recompute the low-rank parameters self.n and self.m from the full-rank parameter W_rec
@@ -233,7 +238,6 @@ class RNNModule(nn.Module):
             n, m = get_nm_from_W(self.W_rec, self.rec_rank)
             self.n = nn.Parameter(n, requires_grad=self.train_recurrent_weights)
             self.m = nn.Parameter(m, requires_grad=self.train_recurrent_weights)
-            self.full_rank = False
 
     @property
     def device(self) -> torch.device:
@@ -251,3 +255,14 @@ class RNNModule(nn.Module):
         return f"""RNN module {self.name} with {self.n_neurons} neurons
 Recurrent connectivity rank: {self.rec_rank if self.rec_rank is not None else "full"}
 """
+
+    def cpu(self):
+        # Call the parent class' cpu method to move all model parameters to CPU
+        super().cpu()
+
+        # Move all the tensors in self.values to CPU, if self.values is not None
+        self.hidden_states = [v.cpu() for v in self.hidden_states]
+        self.rates = [v.cpu() for v in self.rates]
+        self.inputs_at_current_time = [v.cpu() for v in self.inputs_at_current_time]
+
+        return self

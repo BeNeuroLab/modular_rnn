@@ -16,7 +16,7 @@ class FiringRateRNNModule(RNNModule):
         rec_input = r @ (self.rec_mask * self.W_rec).T
 
         r = r + self.alpha * (
-            -r + +self.nonlin_fn(rec_input + inputs_at_current_time) + self.bias
+            -r + self.nonlin_fn(rec_input + inputs_at_current_time) + self.bias
         )
 
         if self.noisy:

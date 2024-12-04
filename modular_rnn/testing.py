@@ -1,8 +1,8 @@
+import dataclasses
+
 import numpy as np
 import pandas as pd
 import torch
-
-import dataclasses
 
 from .models import MultiRegionRNN
 from .tasks.base_task import Task

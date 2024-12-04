@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from typing import Union, Optional
+from typing import Optional, Union
 
 import numpy as np
 import torch
 import torch.nn as nn
 
-from .utils import glorot_gauss_tensor
 from .low_rank_utils import get_nm_from_W
+from .utils import glorot_gauss_tensor
 
 
 @dataclass
@@ -78,7 +78,6 @@ class Connection(nn.Module):
         self.target_name = config.target_name
 
         self.rank = config.rank
-        self.full_rank = self.rank == "full"
 
         self.train_bias = config.train_bias
 
@@ -99,6 +98,10 @@ class Connection(nn.Module):
             self._W = None
 
         self.connect(N_from, N_to)
+
+    @property
+    def full_rank(self):
+        return self.rank == "full"
 
     def connect(self, N_from: int, N_to: int) -> None:
         sparse_mask = torch.rand(N_to, N_from) < self.p_conn
@@ -153,6 +156,12 @@ class Connection(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x @ self.effective_W.T + self.bias
+
+    def to_low_rank(self, rank: int) -> None:
+        _n, _m = get_nm_from_W(self.W, rank)
+        self.n = nn.Parameter(_n, requires_grad=self.train_weights_direction)
+        self.m = nn.Parameter(_m, requires_grad=self.train_weights_direction)
+        self.rank = rank
 
     # def __getattr__(self, name):
     #    return getattr(self.config, name)

@@ -1,12 +1,11 @@
-from typing import Callable, Union, Optional
+import warnings
+from typing import Callable, Optional, Union
 
 import torch
 import torch.nn as nn
 
-from .connections import ConnectionConfig, Connection
-from .modules import RNNModule, ModelOutput, ODEModule
-
-import warnings
+from .connections import Connection, ConnectionConfig
+from .modules import ModelOutput, ODEModule, RNNModule
 
 
 class MultiRegionRNN(nn.Module):
@@ -207,20 +206,30 @@ class MultiRegionRNN(nn.Module):
             region.name: region.rates_tensor for region in self.regions.values()
         }
 
-    def parameters(self):
-        for region in self.regions.values():
-            for p in region.parameters():
-                yield p
+    # def parameters(self):
+    #    for region in self.regions.values():
+    #        for p in region.parameters():
+    #            yield p
 
-        for conn_list in (
-            self.input_connections,
-            self.region_connections,
-            self.output_connections,
-            self.feedback_connections,
-        ):
-            for conn in conn_list:
-                for p in conn.parameters():
-                    yield p
+    #    for conn_list in (
+    #        self.input_connections,
+    #        self.region_connections,
+    #        self.output_connections,
+    #        self.feedback_connections,
+    #    ):
+    #        for conn in conn_list:
+    #            for p in conn.parameters():
+    #                yield p
+
+    def cpu(self):
+        super().cpu()
+
+        for output in self.outputs.values():
+            output.cpu()
+        for region in self.regions.values():
+            region.cpu()
+
+        return self
 
     @property
     def device(self) -> torch.device:

@@ -29,3 +29,13 @@ class ModelOutput(nn.Module):
     @property
     def device(self) -> torch.device:
         return self.dummy_param.device
+
+    def cpu(self):
+        # call the parent class' cpu method to move all model parameters to CPU
+        super().cpu()
+
+        # move all the tensors in self.values to CPU
+        if self.values is not None:
+            self.values = [v.cpu() for v in self.values]
+
+        return self
