@@ -1,10 +1,32 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "modular_rnn"
 version = "0.0.1"
 dependencies = [
-    'numpy',
-    'torch',
+    "numpy",
+    "torch",
+    "jax",
+    "tfp-nightly[jax]",
+    "tqdm",
 ]
+
+[project.optional-dependencies]
+examples = [
+    "pandas",
+    "xarray",
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "scikit-learn",
+    "jupyterlab",
+    "pyaldata @ git+https://github.com/NeuralAnalysis/PyalData.git",
+]
+
+[tool.setuptools.packages.find]
+include = ["modular_rnn*"]
 
 [pycodestyle]
 max-line-length = 92
